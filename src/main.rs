@@ -25,9 +25,9 @@ fn main() {
     let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
     let vertex_shader_src = r#"
-        #version 140
+        #version 120
 
-        in vec2 position;
+        attribute vec2 position;
 
         uniform float t;
 
@@ -39,9 +39,7 @@ fn main() {
     "#;
 
     let fragment_shader_src = r#"
-        #version 140
-
-        out vec4 color;
+        #version 120
 
         uniform float c;
         vec3 nc;
@@ -50,7 +48,7 @@ fn main() {
             nc = vec3(1.0, 0.25, 0.37);
             nc.xz += c;
             nc.y -= c;
-            color = vec4(nc, 1.0);
+            gl_FragColor = vec4(nc, 1.0);
         }
     "#;
 
@@ -59,7 +57,7 @@ fn main() {
     let mut t: f32 = -0.5;
     let mut c: f32 = 0.0;
     event_loop.run(move |ev, _, control_flow| {
-        t += 0.0002;
+        t += 0.02;
         if t > 1.5 {
             t = -1.5;
         }
@@ -74,8 +72,8 @@ fn main() {
         target.draw(&vertex_buffer, &indices, &program, &uniform! {t: t, c: c},
                     &Default::default()).unwrap();
         target.finish().unwrap();
-        // let next_frame_time = std::time::Instant::now() + std::time::Duration::from_nanos(16_666_6667);
-        // *control_flow = glutin::event_loop::ControlFlow::WaitUntil(next_frame_time);
+        let next_frame_time = std::time::Instant::now() + std::time::Duration::from_nanos(16_666_6667);
+        *control_flow = glutin::event_loop::ControlFlow::WaitUntil(next_frame_time);
 
         match ev {
             Event::WindowEvent {event, .. } => match event {

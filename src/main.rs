@@ -3,7 +3,7 @@ extern crate glium;
 extern crate image;
 
 use glium::{glutin, Surface};
-use glium::backend::glutin::glutin::event::{Event};
+use glium::backend::glutin::glutin::event::{Event, VirtualKeyCode};
 use glium::backend::glutin::glutin::dpi::PhysicalSize;
 use std::io::Cursor;
 
@@ -95,30 +95,31 @@ fn main() {
                     *control_flow = glutin::event_loop::ControlFlow::Exit;
                     return
                 },
-                glutin::event::WindowEvent::KeyboardInput {  input, .. } => match input.scancode {
-                    126 => { // Arrow up
-                        vertical += 0.02;
-                        println!("position: {}, {}", horizontal, vertical)
+                glutin::event::WindowEvent::KeyboardInput {  input, .. } => match input.virtual_keycode {
+                    Some(vk) => match vk {
+                        VirtualKeyCode::Up => { // Arrow up
+                            vertical += 0.02;
+                            println!("position: {}, {}", horizontal, vertical)
+                        },
+                        VirtualKeyCode::Down => { // Arrow down
+                            vertical -= 0.02;
+                            println!("position: {}, {}", horizontal, vertical)
+                        },
+                        VirtualKeyCode::Right => { // Arrow right
+                            horizontal += 0.02;
+                            println!("position: {}, {}", horizontal, vertical)
+                        },
+                        VirtualKeyCode::Left => { // Arrow left
+                            horizontal -= 0.02;
+                            println!("position: {}, {}", horizontal, vertical)
+                        },
+                        _ => ()
                     },
-                    125 => { // Arrow down
-                        vertical -= 0.02;
-                        println!("position: {}, {}", horizontal, vertical)
-                    },
-                    124 => { // Arrow right
-                        horizontal += 0.02;
-                        println!("position: {}, {}", horizontal, vertical)
-                    },
-                    123 => { // Arrow left
-                        horizontal -= 0.02;
-                        println!("position: {}, {}", horizontal, vertical)
-                    },
-                    _ => ()
+                    _ => (),
                 }
                 _ => ()
             },
             _ => (),
         }
     });
-
-
 }

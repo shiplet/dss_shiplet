@@ -69,18 +69,15 @@ fn main() {
 
     let program = glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
 
-    let mut t: f32 = 0.0;
+    let mut vertical:f32 = 0.0;
+    let mut horizontal:f32 = 0.0;
     event_loop.run(move |ev, _, control_flow| {
-        t -= 0.0002;
-        if t < -1.25 {
-            t = 1.25;
-        }
         let uniforms = uniform! {
             matrix: [
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
-                [ t , 0.0, 0.0, 1.0f32],
+                [ horizontal , vertical, 0.0, 1.0f32],
             ],
             tex: &tex,
         };
@@ -98,6 +95,25 @@ fn main() {
                     *control_flow = glutin::event_loop::ControlFlow::Exit;
                     return
                 },
+                glutin::event::WindowEvent::KeyboardInput {  input, .. } => match input.scancode {
+                    126 => { // Arrow up
+                        vertical += 0.02;
+                        println!("position: {}, {}", horizontal, vertical)
+                    },
+                    125 => { // Arrow down
+                        vertical -= 0.02;
+                        println!("position: {}, {}", horizontal, vertical)
+                    },
+                    124 => { // Arrow right
+                        horizontal += 0.02;
+                        println!("position: {}, {}", horizontal, vertical)
+                    },
+                    123 => { // Arrow left
+                        horizontal -= 0.02;
+                        println!("position: {}, {}", horizontal, vertical)
+                    },
+                    _ => ()
+                }
                 _ => ()
             },
             _ => (),

@@ -47,8 +47,6 @@ impl Row {
 
 implement_vertex!(Vertex, position, tex_coords);
 
-// pub fn create_row(length: u32) -> Row {}
-
 pub fn create_tile(x: f32, y: f32) -> Vec<Vertex> {
     let vertex1 = Vertex { position: [-0.15 + x,  0.15 + y], tex_coords: [0.0, 0.99]};
     let vertex2 = Vertex { position: [-0.15 + x, -0.15 + y], tex_coords: [0.0, 0.0]};

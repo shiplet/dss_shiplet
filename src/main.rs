@@ -11,9 +11,8 @@ use crate::rendering::screen::{Screen};
 use crate::rendering::shapes::{Vertex, Row};
 use crate::types::DSSData;
 
-#[tokio::main]
-async fn main() {
-    let data = prepare_data().await.unwrap();
+fn main() {
+    let data = prepare_data().unwrap();
     render(data);
 }
 
@@ -30,7 +29,7 @@ fn render(data: DSSData) {
         }
     }
 
-    for (i, container) in active_rows.iter().enumerate() {
+    for (i, &container) in active_rows.iter().enumerate() {
         let mut row = Row::new(i, active_rows.len());
         row.add_placeholder_tiles(container.set.items.as_ref().unwrap().iter().len() as i32);
         renderer.add_shapes(row.tiles.unwrap());

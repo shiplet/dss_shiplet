@@ -79,6 +79,7 @@ impl<'a> Screen<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn add_texture(&mut self) {
         let img = image::load(Cursor::new(&include_bytes!("./right_stuff.jpg")[..]),
                               image::ImageFormat::Jpeg).unwrap().to_rgba16();

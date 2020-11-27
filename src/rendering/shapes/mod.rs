@@ -7,13 +7,13 @@ pub struct Vertex {
 #[derive(Debug, Clone)]
 pub struct Row {
     pub padding: [f32; 4],
-    pub index: i32,
-    pub total: i32,
+    pub index: usize,
+    pub total: usize,
     pub tiles: Option<Vec<Vec<Vertex>>>,
 }
 
 impl Row {
-    pub fn new(index: i32, total: i32) -> Row {
+    pub fn new(index: usize, total: usize) -> Row {
        Row {
            index,
            total,
@@ -21,7 +21,7 @@ impl Row {
            tiles: None,
        }
     }
-    pub fn add_dummy_tiles(&mut self, length: i32) {
+    pub fn add_placeholder_tiles(&mut self, length: i32) {
         if let Some(_t) = &self.tiles {
             println!("tiles already added")
         } else {

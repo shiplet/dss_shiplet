@@ -71,7 +71,7 @@ impl<'a> Screen<'a> {
 		let cb = glutin::ContextBuilder::new();
 		let display = glium::Display::new(wb, cb, event_loop).unwrap();
 		Screen {
-			active_location: ActiveLocation{ x: 0.0, y: 0.0, last_tick: Instant::now(), debounce: Duration::from_millis(150) },
+			active_location: ActiveLocation{ x: 0.0, y: 0.0, last_tick: Instant::now(), debounce: Duration::from_millis(200) },
 			display,
 			program: None,
 			indices: glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList),

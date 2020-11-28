@@ -35,7 +35,6 @@ fn render(data: DSSData) {
 		renderer.add_shapes(row.tiles.unwrap());
 	}
 
-
 	event_loop.run(move |ev, _, control_flow| {
 		renderer.render(&ev, control_flow);
 	});

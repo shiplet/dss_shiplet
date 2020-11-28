@@ -1,5 +1,5 @@
 [package]
-name = "glium_learn"
+name = "dss_shiplet"
 version = "0.1.0"
 authors = ["Ship <shiplet@protonmail.com>"]
 edition = "2018"
@@ -9,3 +9,6 @@ edition = "2018"
 [dependencies]
 glium = "*"
 image = "*"
+reqwest = { "version" = "0.10.9", features = ["blocking"]}
+serde = { "version" = "1.0", features = ["derive"] }
+serde_json = "1.0"

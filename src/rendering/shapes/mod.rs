@@ -1,62 +1,72 @@
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
-    pub position: [f32; 2],
-    pub tex_coords: [f32; 2],
+	pub data: VertexData,
+	pub self_location: [f32; 2],
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct VertexData {
+	pub position: [f32; 2],
+	pub tex_coords: [f32; 2],
+}
+
+implement_vertex!(VertexData, position, tex_coords);
 
 #[derive(Debug, Clone)]
 pub struct Row {
-    pub padding: [f32; 4],
-    pub index: i32,
-    pub total: i32,
-    pub tiles: Option<Vec<Vec<Vertex>>>,
+	pub margin_top: f32,
+	pub margin_left: f32,
+	pub index: usize,
+	pub total: usize,
+	pub tiles: Option<Vec<Vec<Vertex>>>,
 }
 
 impl Row {
-    pub fn new(index: i32, total: i32) -> Row {
-       Row {
-           index,
-           total,
-           padding: [0.35, 0.15, 0.15, 0.15],
-           tiles: None,
-       }
-    }
-    pub fn add_dummy_tiles(&mut self, length: i32) {
-        if let Some(_t) = &self.tiles {
-            println!("tiles already added")
-        } else {
-            let mut tiles = vec![];
-            for n in (length * -1)..0 {
-                let x_const = (length - n.abs()) as f32 * 0.30;
-                let y_const = self.index as f32 * 0.30;
-                let x_box_comp = 1.0 - (self.padding[3] + 0.15);
-                let y_box_comp = 1.0 - (1.0 - self.padding[0]);
-                let padding_left = x_const * self.padding[3];
-                let padding_top = y_const * self.padding[0];
+	pub fn new(index: usize, total: usize) -> Row {
+		Row {
+			index,
+			total,
+			margin_top: 0.35,
+			margin_left: 0.25,
+			tiles: None,
+		}
+	}
+	pub fn add_placeholder_tiles(&mut self, length: i32) {
+		if let Some(_t) = &self.tiles {
+			println!("tiles already added")
+		} else {
+			let mut tiles = vec![];
+			for n in (length * -1)..0 {
+				let og_index = length - n.abs();
+				let x_const = (og_index) as f32 * 0.30;
+				let x_box_comp = 1.0 - (self.margin_left + 0.0325);
+				let padding_left = x_const * self.margin_left;
 
-                let x = (x_const + padding_left) - x_box_comp;
-                let y = 1.0 - (y_const + padding_top) - y_box_comp;
+				let y_const = self.index as f32 * 0.30;
+				let y_box_comp = 1.0 - (1.0 - (self.margin_left + 0.15));
+				let padding_top = self.index as f32 * self.margin_top;
 
-                let tile = create_tile(x, y);
-                tiles.push(tile);
-            }
-            self.tiles = Some(tiles);
-        }
-    }
+				let x = (x_const + padding_left) - x_box_comp;
+				let y = 1.0 - (y_const + padding_top) - y_box_comp;
+
+				// println!("xc: {:.3?}, pl: {:.3?}, xbc: {:.3?}, x: {:.3?}", x_const, padding_left, x_box_comp, x);
+
+				let tile = create_tile(x, y, (length - n.abs()) as f32, self.index as f32);
+				tiles.push(tile);
+			}
+			self.tiles = Some(tiles);
+		}
+	}
 }
 
-implement_vertex!(Vertex, position, tex_coords);
+pub fn create_tile(x: f32, y: f32, col: f32, row: f32) -> Vec<Vertex> {
+	let vertex1 = Vertex { self_location: [col, row], data: VertexData { position: [-0.15 + x,  0.15 + y],  tex_coords: [ 0.0, 0.99] }};
+	let vertex2 = Vertex { self_location: [col, row], data: VertexData { position: [-0.15 + x, -0.15 + y],  tex_coords: [ 0.0,  0.0] }};
+	let vertex3 = Vertex { self_location: [col, row], data: VertexData { position: [ 0.15 + x, -0.15 + y],  tex_coords: [0.99,  0.0] }};
 
-// pub fn create_row(length: u32) -> Row {}
-
-pub fn create_tile(x: f32, y: f32) -> Vec<Vertex> {
-    let vertex1 = Vertex { position: [-0.15 + x,  0.15 + y], tex_coords: [0.0, 0.99]};
-    let vertex2 = Vertex { position: [-0.15 + x, -0.15 + y], tex_coords: [0.0, 0.0]};
-    let vertex3 = Vertex { position: [ 0.15 + x, -0.15 + y], tex_coords: [0.99, 0.0]};
-
-    let vertex4 = Vertex { position: [-0.15 + x,  0.15 + y], tex_coords: [0.0, 0.99]};
-    let vertex5 = Vertex { position: [ 0.15 + x,  0.15 + y], tex_coords: [0.99, 0.99]};
-    let vertex6 = Vertex { position: [ 0.15 + x, -0.15 + y], tex_coords: [0.99, 0.0]};
-    let shape = vec![vertex1, vertex2, vertex3, vertex4, vertex5, vertex6];
-    shape
+	let vertex4 = Vertex { self_location: [col, row], data: VertexData { position: [-0.15 + x,  0.15 + y], tex_coords: [ 0.0, 0.99] }};
+	let vertex5 = Vertex { self_location: [col, row], data: VertexData { position: [ 0.15 + x,  0.15 + y], tex_coords: [0.99, 0.99] }};
+	let vertex6 = Vertex { self_location: [col, row], data: VertexData { position: [ 0.15 + x, -0.15 + y], tex_coords: [0.99,  0.0] }};
+	let shape = vec![vertex1, vertex2, vertex3, vertex4, vertex5, vertex6];
+	shape
 }

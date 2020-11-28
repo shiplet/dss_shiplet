@@ -1,26 +1,41 @@
 mod rendering;
+mod types;
+mod data;
 
 #[macro_use]
 extern crate glium;
 extern crate image;
 
-pub use crate::rendering::screen::*;
-pub use crate::rendering::shapes::{create_tile, Vertex, Row};
-
+use crate::data::{prepare_data};
+use crate::rendering::screen::{Screen};
+use crate::rendering::shapes::{Vertex, Row};
+use crate::types::DSSData;
 
 fn main() {
-    let event_loop = glium::glutin::event_loop::EventLoop::new();
-    let mut renderer = Screen::new(1440, 900, &event_loop);
+	let data = prepare_data().unwrap();
+	render(data);
+}
 
-    renderer.use_default_shaders();
+fn render(data: DSSData) {
+	let event_loop = glium::glutin::event_loop::EventLoop::new();
+	let mut renderer = Screen::new(1440, 900, &event_loop);
 
-    for n in 0..5 {
-        let mut row = Row::new(n, 5);
-        row.add_dummy_tiles(10);
-        renderer.add_shapes(row.tiles.unwrap());
-    }
+	renderer.use_default_shaders();
+	let mut active_rows = vec![];
 
-    event_loop.run(move |ev, _, control_flow| {
-        renderer.render(&ev, control_flow);
-    });
+	for container in data.data.StandardCollection.containers.iter() {
+		if let Some(_) = &container.set.items {
+			active_rows.push(container);
+		}
+	}
+
+	for (i, &container) in active_rows.iter().enumerate() {
+		let mut row = Row::new(i, active_rows.len());
+		row.add_placeholder_tiles(container.set.items.as_ref().unwrap().iter().len() as i32);
+		renderer.add_shapes(row.tiles.unwrap());
+	}
+
+	event_loop.run(move |ev, _, control_flow| {
+		renderer.render(&ev, control_flow);
+	});
 }

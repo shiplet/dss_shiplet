@@ -423,6 +423,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
+name = "dss_shiplet"
+version = "0.1.0"
+dependencies = [
+ "glium",
+ "image",
+ "reqwest",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -587,17 +598,6 @@ dependencies = [
  "memoffset",
  "smallvec",
  "takeable-option",
-]
-
-[[package]]
-name = "glium_learn"
-version = "0.1.0"
-dependencies = [
- "glium",
- "image",
- "reqwest",
- "serde",
- "serde_json",
 ]
 
 [[package]]

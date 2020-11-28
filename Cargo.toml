@@ -1,5 +1,5 @@
 [package]
-name = "glium_learn"
+name = "dss_shiplet"
 version = "0.1.0"
 authors = ["Ship <shiplet@protonmail.com>"]
 edition = "2018"

@@ -13,6 +13,10 @@ use crate::rendering::shapes::VertexData;
 
 pub struct Screen<'a> {
 	pub active_location: ActiveLocation,
+	pub active_rows: f32,
+	pub row_positions: Vec<f32>,
+	pub active_limit_x: f32,
+	pub active_limit_y: f32,
 	pub display: Display,
 	pub program: Option<Program>,
 	pub indices: NoIndices,
@@ -61,6 +65,7 @@ impl ActiveLocation {
 pub struct VertexBufferContainer {
 	pub buffer: VertexBuffer<VertexData>,
 	pub self_location: [f32; 2],
+	pub translate_dist: [f32; 2],
 }
 
 impl<'a> Screen<'a> {
@@ -72,6 +77,10 @@ impl<'a> Screen<'a> {
 		let display = glium::Display::new(wb, cb, event_loop).unwrap();
 		Screen {
 			active_location: ActiveLocation{ x: 0.0, y: 0.0, last_tick: Instant::now(), debounce: Duration::from_millis(200) },
+			active_rows: 0.0,
+			row_positions: Vec::new(),
+			active_limit_x: 0.0,
+			active_limit_y: 0.0,
 			display,
 			program: None,
 			indices: glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList),
@@ -82,6 +91,13 @@ impl<'a> Screen<'a> {
 		}
 	}
 
+	pub fn set_active_rows_count(&mut self, row_count: f32) {
+		self.active_rows = row_count;
+		self.row_positions = vec![0.0 as f32; row_count as usize];
+		self.active_limit_x = (((1.0_f32 / 3.75_f32) * 2.0_f32) * 10.0).floor();
+		self.active_limit_y = ((1.0_f32 / 3.0_f32) * 10.0).floor();
+	}
+
 	pub fn use_default_shaders(&mut self) {
 		let vertex_shader_src = r#"
 		#version 140
@@ -89,12 +105,27 @@ impl<'a> Screen<'a> {
 		in vec2 position;
 		in vec2 tex_coords;
 		out vec2 v_tex_coords;
+
 		uniform mat4 matrix;
+		uniform vec2 self_location;
+		uniform vec2 active_location;
+		uniform vec2 td;
+		uniform float scale;
 
 		void main() {
+			vec2 pos;
+			if (self_location == active_location) {
+				pos = position;
+				pos += vec2(td.x, td.y);
+				pos = pos * scale;
+				pos -= vec2(td.x, td.y);
+			} else {
+				pos = position;
+			}
 			v_tex_coords = tex_coords;
-			gl_Position = matrix * vec4(position, 0.0, 1.0);
-		} "#;
+			gl_Position = matrix * vec4(pos, 0.0, 1.0);
+		}
+		"#;
 
 		let fragment_shader_src = r#"
 		#version 140
@@ -127,7 +158,8 @@ impl<'a> Screen<'a> {
 		let vertex_buffer = glium::VertexBuffer::new(&self.display, &v_data).unwrap();
 		let vbc = VertexBufferContainer{
 			buffer: vertex_buffer,
-			self_location: v[0].self_location,
+			self_location: v[0].self_location.unwrap(), // only need the first one since it's the left-most x-coordinate
+			translate_dist: v[0].translate_dist.unwrap(), // ^^ ditto here
 		};
 		self.vertex_buffers.push(vbc);
 	}
@@ -150,7 +182,7 @@ impl<'a> Screen<'a> {
 	}
 
 	pub fn render(&mut self, ev: &Event<()>, control_flow: &mut ControlFlow) {
-		let p = match &self.program {
+		let program = match &self.program {
 			Some(pg) => pg,
 			None => panic!("must specify shaders - try calling use_default_shaders before running loop")
 		};
@@ -158,23 +190,36 @@ impl<'a> Screen<'a> {
 		let mut target = self.display.draw();
 		target.clear_color(0.0, 0.0, 0.0, 1.0);
 		let active_location = self.active_location.to_vec();
+		let x_trans_overflow = (active_location[0] + 1.0) - self.active_limit_x;
+		let mtx = [
+			[1.0, 0.0, 0.0, 0.0],
+			[0.0, 1.0, 0.0, 0.0],
+			[0.0, 0.0, 1.0, 0.0],
+			[self.horizontal, self.vertical, 0.0, 1.0f32], // translation components
+		];
+
 		for buffer in self.vertex_buffers.iter() {
+			let mut xt: f32 = 0.0;
+			// let mut yt: f32 = 0.0;
 			let self_location = buffer.self_location;
+			let translate_distance = buffer.translate_dist;
+			print!("\u{001b}[1000D");
+			print!("\u{001b}[{}A", self.active_rows as usize);
+			print!("{}", format!("row: {:.3?}\n", self_location[1]).repeat(self.active_rows as usize));
+
 			let uniforms = uniform! {
-				matrix: [
-					[1.0, 0.0, 0.0, 0.0],
-					[0.0, 1.0, 0.0, 0.0],
-					[0.0, 0.0, 1.0, 0.0],
-					[ self.horizontal , self.vertical, 0.0, 1.0f32],
-				],
+				matrix: mtx,
 				self_location: self_location,
 				active_location: active_location,
+				scale: 1.25 as f32,
+				td: translate_distance,
 			};
-			target.draw(&buffer.buffer, &self.indices, &p, &uniforms,
+			target.draw(&buffer.buffer, &self.indices, &program, &uniforms,
 						&Default::default()).unwrap();
 		}
+
 		target.finish().unwrap();
-		let next_frame_time = std::time::Instant::now() + std::time::Duration::from_millis(166_666_667);
+		let next_frame_time = std::time::Instant::now() + std::time::Duration::from_nanos(166_666_667);
 		*control_flow = glutin::event_loop::ControlFlow::WaitUntil(next_frame_time);
 
 		match ev {
@@ -188,6 +233,10 @@ impl<'a> Screen<'a> {
 						VirtualKeyCode::Down => { self.active_location.move_down(); }
 						VirtualKeyCode::Left => { self.active_location.move_left(); }
 						VirtualKeyCode::Right => { self.active_location.move_right(); }
+						VirtualKeyCode::W => { self.vertical -= 0.1; }
+						VirtualKeyCode::A => { self.horizontal += 0.1; }
+						VirtualKeyCode::S => { self.vertical += 0.1; }
+						VirtualKeyCode::D => { self.horizontal -= 0.1; }
 						_ => ()
 					},
 					_ => (),

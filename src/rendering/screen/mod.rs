@@ -234,9 +234,9 @@ impl<'a> Screen<'a> {
 						VirtualKeyCode::Left => { self.active_location.move_left(); }
 						VirtualKeyCode::Right => { self.active_location.move_right(); }
 						VirtualKeyCode::W => { self.vertical -= 0.1; }
-						VirtualKeyCode::A => { self.horizontal -= 0.1; }
+						VirtualKeyCode::A => { self.horizontal += 0.1; }
 						VirtualKeyCode::S => { self.vertical += 0.1; }
-						VirtualKeyCode::D => { self.horizontal += 0.1; }
+						VirtualKeyCode::D => { self.horizontal -= 0.1; }
 						_ => ()
 					},
 					_ => (),

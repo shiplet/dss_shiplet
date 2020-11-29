@@ -29,12 +29,15 @@ fn render(data: DSSData) {
 		}
 	}
 
+	renderer.set_active_rows_count(active_rows.len() as f32);
+
 	for (i, &container) in active_rows.iter().enumerate() {
 		let mut row = Row::new(i, active_rows.len());
 		row.add_placeholder_tiles(container.set.items.as_ref().unwrap().iter().len() as i32);
 		renderer.add_shapes(row.tiles.unwrap());
 	}
 
+	print!("{}", "\n".repeat(active_rows.len()));
 	event_loop.run(move |ev, _, control_flow| {
 		renderer.render(&ev, control_flow);
 	});

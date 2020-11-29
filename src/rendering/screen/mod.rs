@@ -61,6 +61,7 @@ impl ActiveLocation {
 pub struct VertexBufferContainer {
 	pub buffer: VertexBuffer<VertexData>,
 	pub self_location: [f32; 2],
+	pub translate_dist: [f32; 2],
 }
 
 impl<'a> Screen<'a> {
@@ -89,12 +90,28 @@ impl<'a> Screen<'a> {
 		in vec2 position;
 		in vec2 tex_coords;
 		out vec2 v_tex_coords;
+
 		uniform mat4 matrix;
+		uniform vec2 self_location;
+		uniform vec2 active_location;
+		uniform vec2 td;
+		uniform float scale;
 
 		void main() {
+			vec2 pos;
+			if (self_location == active_location) {
+				pos = position;
+				pos += vec2(td.x, td.y);
+				pos = pos * scale;
+				pos -= vec2(td.x, td.y);
+				gl_Position = matrix * vec4(pos, 0.0, 1.0);
+			} else {
+				pos = position;
+				gl_Position = vec4(pos, 0.0, 1.0);
+			}
 			v_tex_coords = tex_coords;
-			gl_Position = matrix * vec4(position, 0.0, 1.0);
-		} "#;
+		}
+		"#;
 
 		let fragment_shader_src = r#"
 		#version 140
@@ -128,6 +145,7 @@ impl<'a> Screen<'a> {
 		let vbc = VertexBufferContainer{
 			buffer: vertex_buffer,
 			self_location: v[0].self_location,
+			translate_dist: v[0].translate_dist,
 		};
 		self.vertex_buffers.push(vbc);
 	}
@@ -160,21 +178,24 @@ impl<'a> Screen<'a> {
 		let active_location = self.active_location.to_vec();
 		for buffer in self.vertex_buffers.iter() {
 			let self_location = buffer.self_location;
+			let translate_distance = buffer.translate_dist;
 			let uniforms = uniform! {
 				matrix: [
 					[1.0, 0.0, 0.0, 0.0],
 					[0.0, 1.0, 0.0, 0.0],
 					[0.0, 0.0, 1.0, 0.0],
-					[ self.horizontal , self.vertical, 0.0, 1.0f32],
+					[0.0, 0.0, 0.0, 1.0f32], // translation components
 				],
 				self_location: self_location,
 				active_location: active_location,
+				scale: 1.25 as f32,
+				td: translate_distance,
 			};
 			target.draw(&buffer.buffer, &self.indices, &p, &uniforms,
 						&Default::default()).unwrap();
 		}
 		target.finish().unwrap();
-		let next_frame_time = std::time::Instant::now() + std::time::Duration::from_millis(166_666_667);
+		let next_frame_time = std::time::Instant::now() + std::time::Duration::from_nanos(166_666_667);
 		*control_flow = glutin::event_loop::ControlFlow::WaitUntil(next_frame_time);
 
 		match ev {

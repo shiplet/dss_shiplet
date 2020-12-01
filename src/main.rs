@@ -22,7 +22,7 @@ fn main() {
 
 fn render(data: DSSData) {
 	let event_loop = glium::glutin::event_loop::EventLoop::new();
-	let mut renderer = Screen::new(1440, 900, &event_loop);
+	let mut renderer = Screen::new(1600, 900, &event_loop);
 	let mut texture_cache: HashMap<String, glium::texture::Texture2d> = HashMap::new();
 
 	renderer.use_default_shaders();

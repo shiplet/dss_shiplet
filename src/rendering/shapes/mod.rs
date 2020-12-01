@@ -56,8 +56,8 @@ impl Row {
 			if let Some(title) = &title_top.set {
 				self.title = title.default.content.to_owned();
 				let x_pos = self.margin_left * 0.25;
-				let y_mult = (self.index as f32 + 0.25) + (self.index as f32 * 0.10);
-				let y_pos = 0.25 * y_mult;
+				let y_multiplier = (self.index as f32 + 0.25) + (self.index as f32 * 0.10);
+				let y_pos = 0.25 * y_multiplier;
 				self.title_pos = [x_pos, y_pos];
 			}
 		}

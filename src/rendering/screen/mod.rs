@@ -15,53 +15,6 @@ use crate::rendering::shapes::{VertexData, Row};
 use glium_glyph::glyph_brush::rusttype::Scale;
 use crate::types::Container;
 
-#[derive(Debug)]
-pub struct VertexBufferContainer {
-	pub buffer: VertexBuffer<VertexData>,
-	pub self_location: [f32; 2],
-	pub translate_dist: [f32; 2],
-}
-
-pub struct ActiveLocation {
-	debounce: Duration,
-	last_tick: Instant,
-	x: f32,
-	y: f32,
-}
-
-impl ActiveLocation {
-	pub fn to_vec(&self) -> [f32; 2] { [self.x, self.y] }
-	pub fn move_up(&mut self) {
-		if self.last_tick.elapsed() >= self.debounce {
-			self.y = max(0, self.y as i32 - 1) as f32;
-			self.last_tick = Instant::now();
-		}
-	}
-	pub fn move_down(&mut self) {
-		if self.last_tick.elapsed() >= self.debounce {
-			self.y = min(4, self.y as i32 + 1) as f32;
-			self.last_tick = Instant::now();
-		}
-	}
-	pub fn move_left(&mut self) {
-		if self.last_tick.elapsed() >= self.debounce {
-			self.x = max(0, self.x as i32 - 1) as f32;
-			self.last_tick = Instant::now();
-		}
-	}
-	pub fn move_right(&mut self) {
-		if self.last_tick.elapsed() >= self.debounce {
-			self.x = min(15, self.x as i32 + 1) as f32;
-			self.last_tick = Instant::now();
-		}
-	}
-}
-
-pub struct RowTitle {
-	title: String,
-	pos: [f32; 2]
-}
-
 pub struct Screen<'a> {
 	pub active_limit_x: f32,
 	pub active_limit_y: f32,
@@ -71,7 +24,7 @@ pub struct Screen<'a> {
 	pub horizontal: f32,
 	pub indices: NoIndices,
 	pub program: Option<Program>,
-	pub row_titles: Vec<RowTitle>,
+	pub row_titles: Vec<ScreenRowTitle>,
 	pub rows: Vec<Container>,
 	pub rows_count: f32,
 	pub text_renderer: GlyphBrush<'a,'a>,
@@ -187,7 +140,7 @@ impl<'a> Screen<'a> {
 	}
 
 	pub fn add_row(&mut self, row: Row) {
-		self.row_titles.push(RowTitle{
+		self.row_titles.push(ScreenRowTitle {
 			title: row.title,
 			pos: row.title_pos
 		});
@@ -290,6 +243,55 @@ impl<'a> Screen<'a> {
 		}
 	}
 }
+
+#[derive(Debug)]
+pub struct VertexBufferContainer {
+	pub buffer: VertexBuffer<VertexData>,
+	pub self_location: [f32; 2],
+	pub translate_dist: [f32; 2],
+}
+
+pub struct ActiveLocation {
+	debounce: Duration,
+	last_tick: Instant,
+	x: f32,
+	y: f32,
+}
+
+impl ActiveLocation {
+	pub fn to_vec(&self) -> [f32; 2] { [self.x, self.y] }
+	pub fn move_up(&mut self) {
+		if self.last_tick.elapsed() >= self.debounce {
+			self.y = max(0, self.y as i32 - 1) as f32;
+			self.last_tick = Instant::now();
+		}
+	}
+	pub fn move_down(&mut self) {
+		if self.last_tick.elapsed() >= self.debounce {
+			self.y = min(4, self.y as i32 + 1) as f32;
+			self.last_tick = Instant::now();
+		}
+	}
+	pub fn move_left(&mut self) {
+		if self.last_tick.elapsed() >= self.debounce {
+			self.x = max(0, self.x as i32 - 1) as f32;
+			self.last_tick = Instant::now();
+		}
+	}
+	pub fn move_right(&mut self) {
+		if self.last_tick.elapsed() >= self.debounce {
+			self.x = min(15, self.x as i32 + 1) as f32;
+			self.last_tick = Instant::now();
+		}
+	}
+}
+
+pub struct ScreenRowTitle {
+	title: String,
+	pos: [f32; 2]
+}
+
+
 
 
 

@@ -31,7 +31,7 @@ impl Row {
 		Row {
 			index,
 			margin_left: 0.25,
-			margin_top: 0.35,
+			margin_top: 0.25,
 			tiles: None,
 			title: String::new(),
 			title_pos: [0.0; 2],
@@ -43,16 +43,8 @@ impl Row {
 		let mut tiles = vec![];
 		for n in -length..0 {
 			let og_index = length - n.abs();
-			let x_const = (og_index) as f32 * 0.30;
-			let x_box_comp = 1.0 - (self.margin_left + 0.0325);
-			let padding_left = x_const * self.margin_left;
-
-			let y_const = self.index as f32 * 0.30;
-			let y_box_comp = 1.0 - (1.0 - (self.margin_left + 0.15));
-			let padding_top = self.index as f32 * self.margin_top;
-
-			let x = (x_const + padding_left) - x_box_comp;
-			let y = 1.0 - (y_const + padding_top) - y_box_comp;
+			let x = self.get_x_pos(og_index);
+			let y = self.get_y_pos();
 
 			let tile = create_tile(x, y, (length - n.abs()) as f32, self.index as f32);
 			tiles.push(tile);
@@ -63,10 +55,28 @@ impl Row {
 		if let Some(title_top) = &container.set.text.title.full {
 			if let Some(title) = &title_top.set {
 				self.title = title.default.content.to_owned();
-				println!("{}", self.title);
+				let x_pos = self.margin_left * 0.25;
+				let y_mult = (self.index as f32 + 0.25) + (self.index as f32 * 0.10);
+				let y_pos = 0.25 * y_mult;
+				self.title_pos = [x_pos, y_pos];
 			}
 		}
 	}
+
+	fn get_x_pos(&self, og_index: i32) -> f32 {
+		let x_const = (og_index) as f32 * 0.30;
+		let x_box_comp = 1.0 - (self.margin_left + 0.0325);
+		let padding_left = x_const * self.margin_left;
+		(x_const + padding_left) - x_box_comp
+	}
+
+	fn get_y_pos(&self) -> f32 {
+		let y_const = self.index as f32 * 0.30;
+		let y_box_comp = 1.0 - (1.0 - (self.margin_top + 0.15));
+		let padding_top = self.index as f32 * self.margin_top;
+		1.0 - (y_const + padding_top) - y_box_comp
+	}
+
 }
 
 pub fn create_tile(x: f32, y: f32, col: f32, row: f32) -> Vec<Vertex> {

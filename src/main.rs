@@ -12,7 +12,7 @@ use crate::rendering::screen::{Screen};
 use crate::rendering::shapes::{Vertex, Row};
 use crate::types::{DSSData};
 
-const DEBUG: bool = true;
+const DEBUG: bool = false;
 
 fn main() {
 	let data = prepare_data().unwrap();
@@ -34,15 +34,15 @@ fn render(data: DSSData) {
 
 	renderer.set_active_rows(active_rows);
 
-	for (i, container) in renderer.active_rows.clone().iter().enumerate() {
-		let mut row = Row::new(i, renderer.active_rows_count as usize);
+	for (i, container) in renderer.rows.clone().iter().enumerate() {
+		let mut row = Row::new(i, renderer.rows_count as usize);
 		row.add_tiles(&container);
 		row.add_row_title(&container);
 		renderer.add_row(row);
 	}
 
 	if DEBUG {
-		print!("{}", "\n".repeat(renderer.active_rows_count as usize)); // this is for the ANSI escape codes used later on
+		print!("{}", "\n".repeat(renderer.rows_count as usize)); // this is for the ANSI escape codes used later on
 	}
 	event_loop.run(move |ev, _, control_flow| {
 		renderer.render(&ev, control_flow);

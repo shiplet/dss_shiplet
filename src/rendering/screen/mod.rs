@@ -57,21 +57,29 @@ impl ActiveLocation {
 	}
 }
 
+pub struct RowTitle {
+	title: String,
+	pos: [f32; 2]
+}
+
 pub struct Screen<'a> {
 	pub active_limit_x: f32,
 	pub active_limit_y: f32,
 	pub active_location: ActiveLocation,
-	pub active_rows: Vec<Container>,
-	pub active_rows_count: f32,
 	pub current_row_positions: Vec<f32>,
 	pub display: Display,
 	pub horizontal: f32,
 	pub indices: NoIndices,
 	pub program: Option<Program>,
+	pub row_titles: Vec<RowTitle>,
+	pub rows: Vec<Container>,
+	pub rows_count: f32,
 	pub text_renderer: GlyphBrush<'a,'a>,
 	pub texture: Option<RawImage2d<'a, u16>>,
 	pub vertex_buffers: Vec<VertexBufferContainer>,
 	pub vertical: f32,
+	pub height: i32,
+	pub width: i32
 }
 
 impl<'a> Screen<'a> {
@@ -87,24 +95,27 @@ impl<'a> Screen<'a> {
 			active_limit_x: 0.0,
 			active_limit_y: 0.0,
 			active_location: ActiveLocation{ x: 0.0, y: 0.0, last_tick: Instant::now(), debounce: Duration::from_millis(200) },
-			active_rows: Vec::new(),
-			active_rows_count: 0.0,
 			current_row_positions: Vec::new(),
 			display,
 			horizontal: 0.0,
 			indices: glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList),
 			program: None,
+			row_titles: Vec::new(),
+			rows: Vec::new(),
+			rows_count: 0.0,
 			text_renderer,
 			texture: None,
 			vertex_buffers: Vec::new(),
 			vertical: 0.0,
+			width,
+			height
 		}
 	}
 
 	pub fn set_active_rows(&mut self, rows: Vec<Container>) {
-		self.active_rows = rows;
-		self.active_rows_count = self.active_rows.len() as f32;
-		self.current_row_positions = vec![0.0 as f32; self.active_rows.len() as usize];
+		self.rows = rows;
+		self.rows_count = self.rows.len() as f32;
+		self.current_row_positions = vec![0.0 as f32; self.rows.len() as usize];
 		self.active_limit_x = (((1.0_f32 / 3.75_f32) * 2.0_f32) * 10.0).floor();
 		self.active_limit_y = ((1.0_f32 / 3.0_f32) * 10.0).floor();
 	}
@@ -176,6 +187,10 @@ impl<'a> Screen<'a> {
 	}
 
 	pub fn add_row(&mut self, row: Row) {
+		self.row_titles.push(RowTitle{
+			title: row.title,
+			pos: row.title_pos
+		});
 		for n in row.tiles.unwrap() {
 			self.add_shape(&n);
 		}
@@ -216,8 +231,8 @@ impl<'a> Screen<'a> {
 			let translate_distance = buffer.translate_dist;
 			if DEBUG {
 				print!("\u{001b}[1000D");
-				print!("\u{001b}[{}A", self.active_rows_count as usize);
-				print!("{}", format!("row: {:.3?}\n", self_location[1]).repeat(self.active_rows_count as usize));
+				print!("\u{001b}[{}A", self.rows_count as usize);
+				print!("{}", format!("row: {:.3?}\n", self_location[1]).repeat(self.rows_count as usize));
 			}
 
 			let uniforms = uniform! {
@@ -233,13 +248,18 @@ impl<'a> Screen<'a> {
 
 		let screen_dims = self.display.get_framebuffer_dimensions();
 
-		self.text_renderer.queue(Section{
-			text: "This is a test",
-			bounds: (screen_dims.0 as f32, screen_dims.1 as f32 / 2.0),
-			color: [1.0, 1.0, 1.0, 1.0],
-			scale: Scale::uniform(24.0),
-			..Section::default()
-		});
+		for row in &self.row_titles {
+			self.text_renderer.queue(Section{
+				text: &row.title.to_string(),
+				bounds: (screen_dims.0 as f32, screen_dims.1 as f32 / 2.0),
+				color: [1.0, 1.0, 1.0, 1.0],
+				scale: Scale::uniform(24.0),
+				screen_position: (row.pos[0] * self.width as f32, row.pos[1] * self.height as f32),
+				..Section::default()
+			});
+		}
+
+
 
 		self.text_renderer.draw_queued(&self.display, &mut target);
 		target.finish().unwrap();

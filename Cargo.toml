@@ -4,10 +4,9 @@ version = "0.1.0"
 authors = ["Ship <shiplet@protonmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-glium = "*"
+glium = "0.28"
+glium-glyph = "0.9.0"
 image = "*"
 reqwest = { "version" = "0.10.9", features = ["blocking"]}
 serde = { "version" = "1.0", features = ["derive"] }

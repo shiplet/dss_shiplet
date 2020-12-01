@@ -3,16 +3,18 @@ use glium::backend::glutin::glutin::event::{Event, VirtualKeyCode};
 use glium::backend::glutin::glutin::event_loop::{EventLoop, ControlFlow};
 use glium::index::NoIndices;
 use glium::{glutin, VertexBuffer, Surface, Program, Display};
-use glium_glyph::glyph_brush::{rusttype::Font, Section};
 use glium_glyph::GlyphBrush;
+use glium_glyph::glyph_brush::rusttype::Scale;
+use glium_glyph::glyph_brush::{rusttype::Font, Section};
 use std::cmp::{min, max};
 use std::io::Cursor;
 use std::time::{Duration, Instant};
 
-use crate::{Vertex, DEBUG};
 use crate::rendering::shapes::{VertexData, Row};
-use glium_glyph::glyph_brush::rusttype::Scale;
 use crate::types::Container;
+use crate::{Vertex, DEBUG};
+use bytes::Buf;
+use image::GenericImageView;
 
 pub struct Screen<'a> {
 	pub active_limit_x: f32,
@@ -108,9 +110,14 @@ impl<'a> Screen<'a> {
 		out vec4 color;
 
 		uniform sampler2D tex;
+		uniform bool texture_exists;
 
 		void main() {
-			color = texture(tex, v_tex_coords);
+			if (texture_exists) {
+				color = texture(tex, v_tex_coords);
+			} else {
+				color = vec4(0.5, 0.0, 0.25, 1.0);
+			}
 		}
 		"#;
 
@@ -127,6 +134,7 @@ impl<'a> Screen<'a> {
 			buffer: vertex_buffer,
 			self_location: v[0].self_location.unwrap(), // only need the first one since it's the left-most x-coordinate
 			translate_dist: v[0].translate_dist.unwrap(), // ^^ ditto here
+			texture_bytes: v[0].texture.clone().unwrap(),			// ^^ ditto again
 		};
 		self.vertex_buffers.push(vbc);
 	}
@@ -141,16 +149,14 @@ impl<'a> Screen<'a> {
 		}
 	}
 
-	#[allow(dead_code)]
-	pub fn add_texture(&mut self) {
-		let img = image::load(Cursor::new(&include_bytes!("./images/right_stuff.jpg")[..]),
-							  image::ImageFormat::Jpeg).unwrap().to_rgba16();
-		let image_dimensions = img.dimensions();
-		let img = glium::texture::RawImage2d::from_raw_rgba_reversed(&img.into_raw(), image_dimensions);
-		// let tex = glium::texture::srgb_texture2d::SrgbTexture2d::new(&self.display, img).unwrap();
-		let tex = glium::texture::Texture2d::new(&self.display, img).unwrap();
-		self.texture = Some(tex);
-	}
+	// fn get_placeholder_texture(&mut self) -> glium::texture::Texture2d {
+	// 	let img = image::load(Cursor::new(&include_bytes!("./images/disney_bg.png")[..]),
+	// 						  image::ImageFormat::Png).unwrap().to_rgba16();
+	// 	let image_dimensions = img.dimensions();
+	// 	let img = glium::texture::RawImage2d::from_raw_rgba_reversed(&img.into_raw(), image_dimensions);
+	// 	let tex = glium::texture::Texture2d::new(&self.display, img).unwrap();
+	// 	tex
+	// }
 
 	pub fn render(&mut self, ev: &Event<()>, control_flow: &mut ControlFlow) {
 		let program = match &self.program {
@@ -171,6 +177,23 @@ impl<'a> Screen<'a> {
 		for buffer in self.vertex_buffers.iter() {
 			let self_location = buffer.self_location;
 			let translate_distance = buffer.translate_dist;
+			let img = image::load_from_memory_with_format(&buffer.texture_bytes.bytes(), image::ImageFormat::Jpeg);
+			let mut texture_exists = true;
+			let tex = match img {
+				Ok(i) => {
+					let img = &i.to_rgba16();
+					let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
+					glium::texture::Texture2d::new(&self.display, img).unwrap()
+				},
+				Err(_) => {
+					texture_exists = false;
+					let img = image::load(Cursor::new(&include_bytes!("./images/disney_bg.png")[..]),
+										  image::ImageFormat::Png).unwrap().to_rgba16();
+					let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
+					glium::texture::Texture2d::new(&self.display, img).unwrap()
+				}
+			};
+
 			if DEBUG {
 				print!("\u{001b}[1000D");
 				print!("\u{001b}[{}A", self.rows_count as usize);
@@ -182,7 +205,8 @@ impl<'a> Screen<'a> {
 				matrix: mtx,
 				scale: 1.25 as f32,
 				self_location: self_location,
-				tex: self.texture.as_ref().unwrap(),
+				tex: &tex,
+				texture_exists: texture_exists,
 				td: translate_distance,
 			};
 			target.draw(&buffer.buffer, &self.indices, &program, &uniforms,
@@ -238,6 +262,7 @@ impl<'a> Screen<'a> {
 pub struct VertexBufferContainer {
 	pub buffer: VertexBuffer<VertexData>,
 	pub self_location: [f32; 2],
+	pub texture_bytes: bytes::Bytes,
 	pub translate_dist: [f32; 2],
 }
 

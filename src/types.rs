@@ -1,5 +1,6 @@
 pub use serde::{Deserialize, Serialize};
 pub use serde_json::{Result, Value};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DSSData {
@@ -36,7 +37,24 @@ pub struct Item {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Image {
-	pub tile: Value,
+	pub tile: HashMap<String, TileImage>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TileImage {
+	pub series: Option<TileImageInner>,
+	pub program: Option<TileImageInner>,
+	pub default: Option<TileImageInner>
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TileImageInner {
+	pub default: ImageData
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ImageData {
+	pub url: String
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

@@ -2,7 +2,6 @@ use glium::backend::glutin::glutin::dpi::PhysicalSize;
 use glium::backend::glutin::glutin::event::{Event, VirtualKeyCode};
 use glium::backend::glutin::glutin::event_loop::{EventLoop, ControlFlow};
 use glium::index::NoIndices;
-use glium::texture::{RawImage2d, Texture2dDataSource};
 use glium::{glutin, VertexBuffer, Surface, Program, Display};
 use glium_glyph::glyph_brush::{rusttype::Font, Section};
 use glium_glyph::GlyphBrush;
@@ -28,7 +27,7 @@ pub struct Screen<'a> {
 	pub rows: Vec<Container>,
 	pub rows_count: f32,
 	pub text_renderer: GlyphBrush<'a,'a>,
-	pub texture: Option<RawImage2d<'a, u16>>,
+	pub texture: Option<glium::texture::Texture2d>,
 	pub vertex_buffers: Vec<VertexBufferContainer>,
 	pub vertical: f32,
 	pub height: i32,
@@ -38,7 +37,7 @@ pub struct Screen<'a> {
 impl<'a> Screen<'a> {
 	pub fn new(width: i32, height: i32, event_loop: &EventLoop<()>) -> Screen<'a> {
 		let wb = glutin::window::WindowBuilder::new()
-			.with_title("Disney Streaming Services Homework")
+			.with_title("Shiplet DSS Homework")
 			.with_inner_size(PhysicalSize::new(width, height));
 		let cb = glutin::ContextBuilder::new();
 		let display = glium::Display::new(wb, cb, event_loop).unwrap();
@@ -109,16 +108,9 @@ impl<'a> Screen<'a> {
 		out vec4 color;
 
 		uniform sampler2D tex;
-		uniform vec2 active_location;
-		uniform vec2 self_location;
-		vec2 pos;
 
 		void main() {
-			if (self_location == active_location) {
-				color = vec4(0.5, 0.25, 0.25, 1.0);
-			} else {
-				color = vec4(0.5, 0.0, 0.25, 1.0);
-			}
+			color = texture(tex, v_tex_coords);
 		}
 		"#;
 
@@ -151,13 +143,13 @@ impl<'a> Screen<'a> {
 
 	#[allow(dead_code)]
 	pub fn add_texture(&mut self) {
-		let img = image::load(Cursor::new(&include_bytes!("./right_stuff.jpg")[..]),
+		let img = image::load(Cursor::new(&include_bytes!("./images/right_stuff.jpg")[..]),
 							  image::ImageFormat::Jpeg).unwrap().to_rgba16();
 		let image_dimensions = img.dimensions();
 		let img = glium::texture::RawImage2d::from_raw_rgba_reversed(&img.into_raw(), image_dimensions);
-		self.texture = Some(img.into_raw())
-		// let tex = glium::texture::Texture2d::new(&self.display, img).unwrap();
-		// self.texture = Some(tex);
+		// let tex = glium::texture::srgb_texture2d::SrgbTexture2d::new(&self.display, img).unwrap();
+		let tex = glium::texture::Texture2d::new(&self.display, img).unwrap();
+		self.texture = Some(tex);
 	}
 
 	pub fn render(&mut self, ev: &Event<()>, control_flow: &mut ControlFlow) {
@@ -169,7 +161,6 @@ impl<'a> Screen<'a> {
 		let mut target = self.display.draw();
 		target.clear_color(0.0, 0.0, 0.0, 1.0);
 		let active_location = self.active_location.to_vec();
-		let _x_trans_overflow = (active_location[0] + 1.0) - self.active_limit_x;
 		let mtx = [
 			[1.0, 0.0, 0.0, 0.0],
 			[0.0, 1.0, 0.0, 0.0],
@@ -178,8 +169,6 @@ impl<'a> Screen<'a> {
 		];
 
 		for buffer in self.vertex_buffers.iter() {
-			let _xt: f32 = 0.0;
-			// let mut yt: f32 = 0.0;
 			let self_location = buffer.self_location;
 			let translate_distance = buffer.translate_dist;
 			if DEBUG {
@@ -193,6 +182,7 @@ impl<'a> Screen<'a> {
 				matrix: mtx,
 				scale: 1.25 as f32,
 				self_location: self_location,
+				tex: self.texture.as_ref().unwrap(),
 				td: translate_distance,
 			};
 			target.draw(&buffer.buffer, &self.indices, &program, &uniforms,

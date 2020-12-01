@@ -24,6 +24,7 @@ fn render(data: DSSData) {
 	let mut renderer = Screen::new(1440, 900, &event_loop);
 
 	renderer.use_default_shaders();
+	renderer.add_texture();
 	let mut active_rows = vec![];
 
 	for container in data.data.StandardCollection.containers.into_iter() {

@@ -5,8 +5,14 @@ use crate::types::{Container, Item};
 pub struct Vertex {
 	pub data: VertexData,
 	pub self_location: Option<[f32; 2]>,
-	pub texture: Option<bytes::Bytes>,
+	pub texture: Option<TextureData>,
 	pub translate_dist: Option<[f32; 2]>,
+}
+
+#[derive(Clone, Debug)]
+pub struct TextureData {
+	pub texture_bytes: bytes::Bytes,
+	pub texture_id: String
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -68,7 +74,7 @@ impl Row {
 		}
 	}
 
-	fn get_image(&self, item: &Item) -> Result<bytes::Bytes, rqErr> {
+	fn get_image(&self, item: &Item) -> Result<TextureData, rqErr> {
 		let url = &item.image.tile["1.78"];
 		let mut img_url = String::new();
 		if let Some(s) = &url.series {
@@ -81,7 +87,10 @@ impl Row {
 			img_url = d.default.url.to_string();
 		}
 		let img_bytes = reqwest::blocking::get(&img_url)?.bytes()?;
-		Ok(img_bytes)
+		Ok(TextureData{
+			texture_bytes: img_bytes,
+			texture_id: img_url
+		})
 	}
 
 	fn get_x_pos(&self, og_index: i32) -> f32 {
@@ -99,7 +108,7 @@ impl Row {
 	}
 }
 
-pub fn create_tile(x: f32, y: f32, col: f32, row: f32, tex: bytes::Bytes) -> Vec<Vertex> {
+pub fn create_tile(x: f32, y: f32, col: f32, row: f32, tex: TextureData) -> Vec<Vertex> {
 	let x_trans = x * -1.0;
 	let y_trans = y * -1.0;
 	let vertex1 = Vertex { self_location: Some([col, row]), texture: Some(tex), translate_dist: Some([x_trans, y_trans]), data: VertexData { position: [-0.15 + x,  0.15 + y],  tex_coords: [ 0.0, 0.99] }};

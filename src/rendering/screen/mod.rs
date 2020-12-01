@@ -14,7 +14,8 @@ use crate::rendering::shapes::{VertexData, Row};
 use crate::types::Container;
 use crate::{Vertex, DEBUG};
 use bytes::Buf;
-use image::GenericImageView;
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 pub struct Screen<'a> {
 	pub active_limit_x: f32,
@@ -30,6 +31,7 @@ pub struct Screen<'a> {
 	pub rows_count: f32,
 	pub text_renderer: GlyphBrush<'a,'a>,
 	pub texture: Option<glium::texture::Texture2d>,
+	pub texture_map: HashMap<String, glium::texture::Texture2d>,
 	pub vertex_buffers: Vec<VertexBufferContainer>,
 	pub vertical: f32,
 	pub height: i32,
@@ -59,6 +61,7 @@ impl<'a> Screen<'a> {
 			rows_count: 0.0,
 			text_renderer,
 			texture: None,
+			texture_map: HashMap::new(),
 			vertex_buffers: Vec::new(),
 			vertical: 0.0,
 			width,
@@ -110,14 +113,9 @@ impl<'a> Screen<'a> {
 		out vec4 color;
 
 		uniform sampler2D tex;
-		uniform bool texture_exists;
 
 		void main() {
-			if (texture_exists) {
-				color = texture(tex, v_tex_coords);
-			} else {
-				color = vec4(0.5, 0.0, 0.25, 1.0);
-			}
+			color = texture(tex, v_tex_coords);
 		}
 		"#;
 
@@ -130,11 +128,13 @@ impl<'a> Screen<'a> {
 			v_data.push(vtx.data);
 		}
 		let vertex_buffer = glium::VertexBuffer::new(&self.display, &v_data).unwrap();
+		let texture = v[0].texture.clone().unwrap();
 		let vbc = VertexBufferContainer{
 			buffer: vertex_buffer,
 			self_location: v[0].self_location.unwrap(), // only need the first one since it's the left-most x-coordinate
 			translate_dist: v[0].translate_dist.unwrap(), // ^^ ditto here
-			texture_bytes: v[0].texture.clone().unwrap(),			// ^^ ditto again
+			texture_bytes: texture.texture_bytes,			// ^^ ditto again
+			texture_id: texture.texture_id
 		};
 		self.vertex_buffers.push(vbc);
 	}
@@ -158,8 +158,33 @@ impl<'a> Screen<'a> {
 	// 	tex
 	// }
 
-	pub fn render(&mut self, ev: &Event<()>, control_flow: &mut ControlFlow) {
-		let program = match &self.program {
+	fn get_or_create_texture(texture_map: &'a mut HashMap<String, glium::texture::Texture2d>, display: &Display, tex_id: String, tex_bytes: &bytes::Bytes) -> &'a glium::texture::Texture2d {
+        match texture_map.entry(tex_id.clone()) {
+            Entry::Occupied(t) => t.into_mut(),
+			Entry::Vacant(m) => {
+				let img = image::load_from_memory(tex_bytes.bytes());
+				match img {
+					Ok(i) => {
+						let img = &i.to_rgba16();
+						let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
+						let t = glium::texture::Texture2d::new(display, img).unwrap();
+						m.insert(t)
+					},
+					Err(_) => {
+						let img = image::load(Cursor::new(&include_bytes!("./images/disney_bg.png")[..]),
+											  image::ImageFormat::Png).unwrap().to_rgba16();
+						let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
+						let t = glium::texture::Texture2d::new(display, img).unwrap();
+						m.insert(t)
+					}
+				}
+			}
+		};
+        texture_map.get(tex_id.as_str()).unwrap()
+	}
+
+	pub fn render(&mut self, ev: &Event<()>, control_flow: &mut ControlFlow, texture_cache: &mut HashMap<String, glium::texture::Texture2d>) {
+		let program = match self.program.as_mut() {
 			Some(pg) => pg,
 			None => panic!("must specify shaders - try calling use_default_shaders before running loop")
 		};
@@ -177,22 +202,7 @@ impl<'a> Screen<'a> {
 		for buffer in self.vertex_buffers.iter() {
 			let self_location = buffer.self_location;
 			let translate_distance = buffer.translate_dist;
-			let img = image::load_from_memory_with_format(&buffer.texture_bytes.bytes(), image::ImageFormat::Jpeg);
-			let mut texture_exists = true;
-			let tex = match img {
-				Ok(i) => {
-					let img = &i.to_rgba16();
-					let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
-					glium::texture::Texture2d::new(&self.display, img).unwrap()
-				},
-				Err(_) => {
-					texture_exists = false;
-					let img = image::load(Cursor::new(&include_bytes!("./images/disney_bg.png")[..]),
-										  image::ImageFormat::Png).unwrap().to_rgba16();
-					let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
-					glium::texture::Texture2d::new(&self.display, img).unwrap()
-				}
-			};
+            let img = Screen::get_or_create_texture(texture_cache, &self.display, buffer.texture_id.clone(), &buffer.texture_bytes);
 
 			if DEBUG {
 				print!("\u{001b}[1000D");
@@ -205,8 +215,7 @@ impl<'a> Screen<'a> {
 				matrix: mtx,
 				scale: 1.25 as f32,
 				self_location: self_location,
-				tex: &tex,
-				texture_exists: texture_exists,
+				tex: img,
 				td: translate_distance,
 			};
 			target.draw(&buffer.buffer, &self.indices, &program, &uniforms,
@@ -263,6 +272,7 @@ pub struct VertexBufferContainer {
 	pub buffer: VertexBuffer<VertexData>,
 	pub self_location: [f32; 2],
 	pub texture_bytes: bytes::Bytes,
+	pub texture_id: String,
 	pub translate_dist: [f32; 2],
 }
 

@@ -194,24 +194,27 @@ impl<'a> Screen<'a> {
 		let mut target = self.display.draw();
 		target.clear_color(0.00625, 0.00625, 0.00625, 1.0);
 		let active_location = self.active_location.to_vec();
-		let mtx = [
-			[1.0, 0.0, 0.0, 0.0],
-			[0.0, 1.0, 0.0, 0.0],
-			[0.0, 0.0, 1.0, 0.0],
-			[self.horizontal, self.vertical, 0.0, 1.0f32], // translation components
-		];
+
 
 		for buffer in self.vertex_buffers.iter() {
+			let mut horizontal = 0.0;
+			let mut vertical = 0.0;
 			let self_location = buffer.self_location;
 			let tst_distance = buffer.tst_distance;
+			if self_location[1] == active_location[1] && self.active_location.should_translate_row() {
+				horizontal = (self.active_location.x - self.active_location.virtual_x) as f32 * -0.375;
+			}
+			if self.active_location.should_translate_col() {
+				vertical = (self.active_location.y - self.active_location.virtual_y) as f32 * 0.675;
+			}
+			let mtx = [
+				[1.0, 0.0, 0.0, 0.0],
+				[0.0, 1.0, 0.0, 0.0],
+				[0.0, 0.0, 1.0, 0.0],
+				[horizontal, vertical, 0.0, 1.0f32], // translation components
+			];
+
             let img = Screen::get_or_create_texture(texture_cache, &self.display, buffer.texture_id.clone(), &buffer.texture_bytes);
-
-			// if DEBUG {
-			// 	print!("\u{001b}[1000D");
-			// 	print!("\u{001b}[{}A", self.rows_count as usize);
-			// 	print!("{}", format!("row: {:.3?}\n", self_location[1]).repeat(self.rows_count as usize));
-			// }
-
 			let uniforms = uniform! {
 				active_location: active_location,
 				matrix: mtx,
@@ -337,11 +340,11 @@ impl ActiveLocation {
 	}
 
 	pub fn should_translate_row(&self) -> bool {
-		(self.virtual_x == 0 && self.x > 0) || (self.virtual_x == self.virtual_x_limit - 1 && (self.x > self.virtual_x && self.x < self.x_limit))
+		(self.virtual_x >= 0 && self.x > 0) || (self.virtual_x == self.virtual_x_limit - 1 && (self.x > self.virtual_x && self.x < self.x_limit))
 	}
 
 	pub fn should_translate_col(&self) -> bool {
-		(self.virtual_y == 0 && self.y > 0) || (self.virtual_y == self.virtual_y_limit - 1 && (self.y > self.virtual_y && self.y < self.y_limit))
+		(self.virtual_y >= 0 && self.y > 0) || (self.virtual_y == self.virtual_y_limit - 1 && (self.y > self.virtual_y && self.y < self.y_limit))
 	}
 }
 

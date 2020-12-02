@@ -7,12 +7,12 @@ use glium_glyph::GlyphBrush;
 use glium_glyph::glyph_brush::rusttype::Scale;
 use glium_glyph::glyph_brush::{rusttype::Font, Section};
 use std::cmp::{min, max};
-use std::io::Cursor;
+use std::io::{Cursor, stdout, Write};
 use std::time::{Duration, Instant};
 
 use crate::rendering::shapes::{VertexData, Row};
 use crate::types::Container;
-use crate::{Vertex};
+use crate::Vertex;
 
 use bytes::Buf;
 use std::collections::HashMap;
@@ -20,6 +20,7 @@ use std::collections::hash_map::Entry;
 
 pub struct Screen<'a> {
 	pub active_location: ActiveLocation,
+	pub active_scale_ratio: f32,
 	pub current_row_positions: Vec<f32>,
 	pub display: Display,
 	pub global_position_cache: HashMap<String, f32>,
@@ -62,6 +63,7 @@ impl<'a> Screen<'a> {
 		};
 		Screen {
 			active_location,
+			active_scale_ratio: 1.45,
 			current_row_positions: Vec::new(),
 			display,
 			global_position_cache: HashMap::new(),
@@ -199,6 +201,7 @@ impl<'a> Screen<'a> {
 		let active_location = self.active_location.to_vec();
 
 
+		let vertical = (self.active_location.y - self.active_location.virtual_y) as f32 * 0.625;
 		for buffer in self.vertex_buffers.iter() {
 			let self_location = buffer.self_location;
 			let tst_distance = buffer.tst_distance;
@@ -206,7 +209,6 @@ impl<'a> Screen<'a> {
 				let horizontal = (self.active_location.x - self.active_location.virtual_x) as f32 * -0.375;
 				self.global_position_cache.insert(self_location[1].to_string(), horizontal);
 			}
-			let vertical = (self.active_location.y - self.active_location.virtual_y) as f32 * 0.675;
 			let horizontal = self.global_position_cache.entry(self_location[1].to_string()).or_insert(0.0).to_owned();
 			let mtx = [
 				[1.0, 0.0, 0.0, 0.0],
@@ -219,7 +221,7 @@ impl<'a> Screen<'a> {
 			let uniforms = uniform! {
 				active_location: active_location,
 				matrix: mtx,
-				scale: 1.25 as f32,
+				scale: self.active_scale_ratio,
 				self_location: self_location,
 				tex: img,
 				td: tst_distance,
@@ -231,6 +233,9 @@ impl<'a> Screen<'a> {
 		let screen_dims = self.display.get_framebuffer_dimensions();
 
 		for row in &self.row_titles {
+			let adjusted_vertical = row.pos[1] * (self.active_location.virtual_y - self.active_location.y) as f32 * 0.625;
+            print!("\ractive y: {} | virtual y: {} | offset: {}{}", self.active_location.y, self.active_location.virtual_y, adjusted_vertical, " ".repeat(25));
+			stdout().flush().unwrap();
 			self.text_renderer.queue(Section{
 				text: &row.title.to_string(),
 				bounds: (screen_dims.0 as f32, screen_dims.1 as f32 / 2.0),
@@ -323,7 +328,7 @@ impl ActiveLocation {
 			self.virtual_y = min(self.virtual_y_limit - 1, self.virtual_y + 1);
 			self.y = min(self.y_limit - 1, self.y + 1);
 
-			let target_row_snapshot = self.x_cache.entry(self.y.to_string()).or_insert(row_snapshot).to_owned();
+			let target_row_snapshot = self.x_cache.entry(self.y.to_string()).or_insert((0..self.virtual_x_limit).collect()).to_owned();
 			self.x = target_row_snapshot[self.virtual_x as usize];
 			self.last_tick = Instant::now();
 		}

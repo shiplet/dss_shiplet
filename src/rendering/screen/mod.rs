@@ -58,7 +58,6 @@ impl<'a> Screen<'a> {
 			virtual_y: 0,
 			virtual_x_limit: ((2.0 / 0.375) as f32).floor() as i32,
 			virtual_y_limit: ((2.0 / 0.625) as f32).floor() as i32,
-			virtual_x_cache: HashMap::new(),
 			x_cache: HashMap::new()
 		};
 		Screen {
@@ -294,8 +293,7 @@ pub struct ActiveLocation {
 	virtual_y: i32,
 	virtual_x_limit: i32,
 	virtual_y_limit: i32,
-	virtual_x_cache: HashMap<String, i32>,
-	x_cache: HashMap<String, i32>,
+	x_cache: HashMap<String, Vec<i32>>,
 }
 
 impl ActiveLocation {
@@ -308,23 +306,25 @@ impl ActiveLocation {
 	}
 	pub fn move_up(&mut self) {
 		if self.last_tick.elapsed() >= self.debounce {
+			let row_snapshot: Vec<i32> = ((self.x - self.virtual_x)..(self.x - self.virtual_x) + 5).collect();
+			self.x_cache.insert(self.y.to_string(), row_snapshot.clone());
 			self.virtual_y = max(0, self.virtual_y - 1);
 			self.y = max(0, self.y - 1);
-			let previous_virtual_x = self.virtual_x_cache.entry(self.y.to_string()).or_insert(self.virtual_x).to_owned();
-			let previous_x = self.x_cache.entry(self.y.to_string()).or_insert(self.x).to_owned();
-			println!("({} - {}) + ({} - {})", self.x, self.virtual_x, previous_x, previous_virtual_x);
-			self.x += (self.x - self.virtual_x) + (previous_x - previous_virtual_x);
+
+			let target_row_snapshot = self.x_cache.entry(self.y.to_string()).or_insert(row_snapshot).to_owned();
+			self.x = target_row_snapshot[self.virtual_x as usize];
 			self.last_tick = Instant::now();
 		}
 	}
 	pub fn move_down(&mut self) {
 		if self.last_tick.elapsed() >= self.debounce {
-			self.x_cache.insert(self.y.to_string(), self.x);
-			self.virtual_x_cache.insert(self.y.to_string(), self.virtual_x);
-
+			let row_snapshot: Vec<i32> = ((self.x - self.virtual_x)..(self.x - self.virtual_x) + 5).collect();
+			self.x_cache.insert(self.y.to_string(), row_snapshot.clone());
 			self.virtual_y = min(self.virtual_y_limit - 1, self.virtual_y + 1);
 			self.y = min(self.y_limit - 1, self.y + 1);
-			self.x -= self.x - self.virtual_x;
+
+			let target_row_snapshot = self.x_cache.entry(self.y.to_string()).or_insert(row_snapshot).to_owned();
+			self.x = target_row_snapshot[self.virtual_x as usize];
 			self.last_tick = Instant::now();
 		}
 	}

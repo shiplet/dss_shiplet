@@ -3,20 +3,22 @@ use glium::backend::glutin::glutin::event::{Event, VirtualKeyCode};
 use glium::backend::glutin::glutin::event_loop::{EventLoop, ControlFlow};
 use glium::index::NoIndices;
 use glium::{glutin, VertexBuffer, Surface, Program, Display};
-use glium_glyph::glyph_brush::{rusttype::Font, Section};
 use glium_glyph::GlyphBrush;
+use glium_glyph::glyph_brush::rusttype::Scale;
+use glium_glyph::glyph_brush::{rusttype::Font, Section};
 use std::cmp::{min, max};
-use std::io::Cursor;
+use std::io::{Cursor, stdout, Write};
 use std::time::{Duration, Instant};
 
-use crate::{Vertex, DEBUG};
 use crate::rendering::shapes::{VertexData, Row};
-use glium_glyph::glyph_brush::rusttype::Scale;
 use crate::types::Container;
+use crate::{Vertex};
+
+use bytes::Buf;
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 pub struct Screen<'a> {
-	pub active_limit_x: f32,
-	pub active_limit_y: f32,
 	pub active_location: ActiveLocation,
 	pub current_row_positions: Vec<f32>,
 	pub display: Display,
@@ -27,7 +29,8 @@ pub struct Screen<'a> {
 	pub rows: Vec<Container>,
 	pub rows_count: f32,
 	pub text_renderer: GlyphBrush<'a,'a>,
-	pub texture: Option<glium::texture::Texture2d>,
+	pub texture: Option<glium::texture::SrgbTexture2d>,
+	pub texture_map: HashMap<String, glium::texture::SrgbTexture2d>,
 	pub vertex_buffers: Vec<VertexBufferContainer>,
 	pub vertical: f32,
 	pub height: i32,
@@ -43,10 +46,20 @@ impl<'a> Screen<'a> {
 		let display = glium::Display::new(wb, cb, event_loop).unwrap();
 		let fonts = vec![Font::from_bytes(include_bytes!("./fonts/NunitoSans-SemiBold.ttf")).unwrap()];
 		let text_renderer = GlyphBrush::new(&display, fonts);
+		let active_location = ActiveLocation{
+			debounce: Duration::from_millis(200),
+			last_tick: Instant::now(),
+			x: 0,
+			y: 0,
+			x_limit: 0,
+			y_limit: 0,
+			virtual_x: 0,
+			virtual_y: 0,
+			virtual_x_limit: ((2.0 / 0.375) as f32).floor() as i32,
+			virtual_y_limit: ((2.0 / 0.625) as f32).floor() as i32
+		};
 		Screen {
-			active_limit_x: 0.0,
-			active_limit_y: 0.0,
-			active_location: ActiveLocation{ x: 0.0, y: 0.0, last_tick: Instant::now(), debounce: Duration::from_millis(200) },
+			active_location,
 			current_row_positions: Vec::new(),
 			display,
 			horizontal: 0.0,
@@ -57,6 +70,7 @@ impl<'a> Screen<'a> {
 			rows_count: 0.0,
 			text_renderer,
 			texture: None,
+			texture_map: HashMap::new(),
 			vertex_buffers: Vec::new(),
 			vertical: 0.0,
 			width,
@@ -67,12 +81,13 @@ impl<'a> Screen<'a> {
 	pub fn set_active_rows(&mut self, rows: Vec<Container>) {
 		self.rows = rows;
 		self.rows_count = self.rows.len() as f32;
+		self.active_location.set_max_rows(self.rows_count as i32);
 		self.current_row_positions = vec![0.0 as f32; self.rows.len() as usize];
-		self.active_limit_x = (((1.0_f32 / 3.75_f32) * 2.0_f32) * 10.0).floor();
-		self.active_limit_y = ((1.0_f32 / 3.0_f32) * 10.0).floor();
+		// self.active_limit_x = (((1.0_f32 / 3.75_f32) * 2.0_f32) * 10.0).floor();
+		// self.active_limit_y = ((1.0_f32 / 3.0_f32) * 10.0).floor();
 	}
 
-	pub fn use_default_shaders(&mut self) {
+	pub fn use_default_tile_shaders(&mut self) {
 		let vertex_shader_src = r#"
 		#version 140
 
@@ -123,15 +138,19 @@ impl<'a> Screen<'a> {
 			v_data.push(vtx.data);
 		}
 		let vertex_buffer = glium::VertexBuffer::new(&self.display, &v_data).unwrap();
+		let texture = v[0].texture.clone().unwrap();
 		let vbc = VertexBufferContainer{
 			buffer: vertex_buffer,
 			self_location: v[0].self_location.unwrap(), // only need the first one since it's the left-most x-coordinate
-			translate_dist: v[0].translate_dist.unwrap(), // ^^ ditto here
+			tst_distance: v[0].tst_distance.unwrap(), // ^^ ditto here
+			texture_bytes: texture.texture_bytes,			// ^^ ditto again
+			texture_id: texture.texture_id
 		};
 		self.vertex_buffers.push(vbc);
 	}
 
 	pub fn add_row(&mut self, row: Row) {
+		self.active_location.set_max_tiles(row.tiles.as_ref().unwrap().len() as i32);
 		self.row_titles.push(ScreenRowTitle {
 			title: row.title,
 			pos: row.title_pos
@@ -141,49 +160,68 @@ impl<'a> Screen<'a> {
 		}
 	}
 
-	#[allow(dead_code)]
-	pub fn add_texture(&mut self) {
-		let img = image::load(Cursor::new(&include_bytes!("./images/right_stuff.jpg")[..]),
-							  image::ImageFormat::Jpeg).unwrap().to_rgba16();
-		let image_dimensions = img.dimensions();
-		let img = glium::texture::RawImage2d::from_raw_rgba_reversed(&img.into_raw(), image_dimensions);
-		// let tex = glium::texture::srgb_texture2d::SrgbTexture2d::new(&self.display, img).unwrap();
-		let tex = glium::texture::Texture2d::new(&self.display, img).unwrap();
-		self.texture = Some(tex);
+	fn get_or_create_texture(texture_map: &'a mut HashMap<String, glium::texture::SrgbTexture2d>, display: &Display, tex_id: String, tex_bytes: &bytes::Bytes) -> &'a glium::texture::SrgbTexture2d {
+        match texture_map.entry(tex_id.clone()) {
+            Entry::Occupied(t) => t.into_mut(),
+			Entry::Vacant(m) => {
+				let img = image::load_from_memory(tex_bytes.bytes());
+				match img {
+					Ok(i) => {
+						let img = &i.to_rgba16();
+						let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
+						let t = glium::texture::SrgbTexture2d::new(display, img).unwrap();
+						m.insert(t)
+					},
+					Err(_) => {
+						let img = image::load(Cursor::new(&include_bytes!("./images/disney_bg.png")[..]),
+											  image::ImageFormat::Png).unwrap().to_rgba16();
+						let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
+						let t = glium::texture::SrgbTexture2d::new(display, img).unwrap();
+						m.insert(t)
+					}
+				}
+			}
+		};
+        texture_map.get(tex_id.as_str()).unwrap()
 	}
 
-	pub fn render(&mut self, ev: &Event<()>, control_flow: &mut ControlFlow) {
-		let program = match &self.program {
+	pub fn render(&mut self, ev: &Event<()>, control_flow: &mut ControlFlow, texture_cache: &mut HashMap<String, glium::texture::SrgbTexture2d>) {
+		let program = match self.program.as_mut() {
 			Some(pg) => pg,
 			None => panic!("must specify shaders - try calling use_default_shaders before running loop")
 		};
 
 		let mut target = self.display.draw();
-		target.clear_color(0.0, 0.0, 0.0, 1.0);
+		target.clear_color(0.00625, 0.00625, 0.00625, 1.0);
 		let active_location = self.active_location.to_vec();
-		let mtx = [
-			[1.0, 0.0, 0.0, 0.0],
-			[0.0, 1.0, 0.0, 0.0],
-			[0.0, 0.0, 1.0, 0.0],
-			[self.horizontal, self.vertical, 0.0, 1.0f32], // translation components
-		];
+
 
 		for buffer in self.vertex_buffers.iter() {
+			let mut horizontal = 0.0;
+			let mut vertical = 0.0;
 			let self_location = buffer.self_location;
-			let translate_distance = buffer.translate_dist;
-			if DEBUG {
-				print!("\u{001b}[1000D");
-				print!("\u{001b}[{}A", self.rows_count as usize);
-				print!("{}", format!("row: {:.3?}\n", self_location[1]).repeat(self.rows_count as usize));
+			let tst_distance = buffer.tst_distance;
+			if self_location[1] == active_location[1] && self.active_location.should_translate_row() {
+				horizontal = (self.active_location.x - self.active_location.virtual_x) as f32 * -0.375;
 			}
+			if self.active_location.should_translate_col() {
+				vertical = (self.active_location.y - self.active_location.virtual_y) as f32 * 0.675;
+			}
+			let mtx = [
+				[1.0, 0.0, 0.0, 0.0],
+				[0.0, 1.0, 0.0, 0.0],
+				[0.0, 0.0, 1.0, 0.0],
+				[horizontal, vertical, 0.0, 1.0f32], // translation components
+			];
 
+            let img = Screen::get_or_create_texture(texture_cache, &self.display, buffer.texture_id.clone(), &buffer.texture_bytes);
 			let uniforms = uniform! {
 				active_location: active_location,
 				matrix: mtx,
 				scale: 1.25 as f32,
 				self_location: self_location,
-				tex: self.texture.as_ref().unwrap(),
-				td: translate_distance,
+				tex: img,
+				td: tst_distance,
 			};
 			target.draw(&buffer.buffer, &self.indices, &program, &uniforms,
 						&Default::default()).unwrap();
@@ -238,41 +276,75 @@ impl<'a> Screen<'a> {
 pub struct VertexBufferContainer {
 	pub buffer: VertexBuffer<VertexData>,
 	pub self_location: [f32; 2],
-	pub translate_dist: [f32; 2],
+	pub texture_bytes: bytes::Bytes,
+	pub texture_id: String,
+	pub tst_distance: [f32; 2],
 }
 
 pub struct ActiveLocation {
 	debounce: Duration,
 	last_tick: Instant,
-	x: f32,
-	y: f32,
+	x: i32,
+	y: i32,
+	x_limit: i32,
+	y_limit: i32,
+	virtual_x: i32,
+	virtual_y: i32,
+	virtual_x_limit: i32,
+	virtual_y_limit: i32
 }
 
 impl ActiveLocation {
-	pub fn to_vec(&self) -> [f32; 2] { [self.x, self.y] }
+	pub fn to_vec(&self) -> [f32; 2] { [self.x as f32, self.y as f32] }
+	pub fn set_max_tiles(&mut self, limit: i32) {
+		self.x_limit = limit;
+	}
+	pub fn set_max_rows(&mut self, limit: i32) {
+		self.y_limit = limit;
+	}
 	pub fn move_up(&mut self) {
 		if self.last_tick.elapsed() >= self.debounce {
-			self.y = max(0, self.y as i32 - 1) as f32;
+			self.virtual_y = max(0, self.virtual_y - 1);
+			self.y = max(0, self.y - 1);
+			print!("\ractive: ({}, {}) | virtual: ({}, {}) | should translate col: {}{}", self.x, self.y, self.virtual_x, self.virtual_y, self.should_translate_col(), " ".repeat(10));
+			stdout().flush().unwrap();
 			self.last_tick = Instant::now();
 		}
 	}
 	pub fn move_down(&mut self) {
 		if self.last_tick.elapsed() >= self.debounce {
-			self.y = min(4, self.y as i32 + 1) as f32;
+			self.virtual_y = min(self.virtual_y_limit - 1, self.virtual_y + 1);
+			self.y = min(self.y_limit - 1, self.y + 1);
+			print!("\ractive: ({}, {}) | virtual: ({}, {}) | should translate col: {}{}", self.x, self.y, self.virtual_x, self.virtual_y, self.should_translate_col(), " ".repeat(10));
+			stdout().flush().unwrap();
 			self.last_tick = Instant::now();
 		}
 	}
 	pub fn move_left(&mut self) {
 		if self.last_tick.elapsed() >= self.debounce {
-			self.x = max(0, self.x as i32 - 1) as f32;
+			self.virtual_x = max(0, self.virtual_x - 1);
+			self.x = max(0, self.x- 1);
+			print!("\ractive: ({}, {}) | virtual: ({}, {}) | should translate row: {}{}", self.x, self.y, self.virtual_x, self.virtual_y, self.should_translate_row(), " ".repeat(10));
+			stdout().flush().unwrap();
 			self.last_tick = Instant::now();
 		}
 	}
 	pub fn move_right(&mut self) {
 		if self.last_tick.elapsed() >= self.debounce {
-			self.x = min(15, self.x as i32 + 1) as f32;
+			self.virtual_x = min(self.virtual_x_limit - 1, self.virtual_x + 1);
+			self.x = min(self.x_limit - 1, self.x + 1);
+			print!("\ractive: ({}, {}) | virtual: ({}, {}) | should translate row: {}{}", self.x, self.y, self.virtual_x, self.virtual_y, self.should_translate_row(), " ".repeat(10));
+			stdout().flush().unwrap();
 			self.last_tick = Instant::now();
 		}
+	}
+
+	pub fn should_translate_row(&self) -> bool {
+		(self.virtual_x >= 0 && self.x > 0) || (self.virtual_x == self.virtual_x_limit - 1 && (self.x > self.virtual_x && self.x < self.x_limit))
+	}
+
+	pub fn should_translate_col(&self) -> bool {
+		(self.virtual_y >= 0 && self.y > 0) || (self.virtual_y == self.virtual_y_limit - 1 && (self.y > self.virtual_y && self.y < self.y_limit))
 	}
 }
 

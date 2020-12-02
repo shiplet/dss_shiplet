@@ -11,8 +11,9 @@ use crate::data::{prepare_data};
 use crate::rendering::screen::{Screen};
 use crate::rendering::shapes::{Vertex, Row};
 use crate::types::{DSSData};
+use std::collections::HashMap;
 
-const DEBUG: bool = false;
+// const DEBUG: bool = false;
 
 fn main() {
 	let data = prepare_data().unwrap();
@@ -21,10 +22,10 @@ fn main() {
 
 fn render(data: DSSData) {
 	let event_loop = glium::glutin::event_loop::EventLoop::new();
-	let mut renderer = Screen::new(1440, 900, &event_loop);
+	let mut renderer = Screen::new(1600, 900, &event_loop);
+	let mut texture_cache: HashMap<String, glium::texture::SrgbTexture2d> = HashMap::new();
 
-	renderer.use_default_shaders();
-	renderer.add_texture();
+	renderer.use_default_tile_shaders();
 	let mut active_rows = vec![];
 
 	for container in data.data.StandardCollection.containers.into_iter() {
@@ -42,10 +43,11 @@ fn render(data: DSSData) {
 		renderer.add_row(row);
 	}
 
-	if DEBUG {
-		print!("{}", "\n".repeat(renderer.rows_count as usize)); // this is for the ANSI escape codes used later on
-	}
+	// if DEBUG {
+	// 	print!("{}", "\n".repeat(renderer.rows_count as usize)); // this is for the ANSI escape codes used later on
+	// }
+
 	event_loop.run(move |ev, _, control_flow| {
-		renderer.render(&ev, control_flow);
+		renderer.render(&ev, control_flow, &mut texture_cache);
 	});
 }

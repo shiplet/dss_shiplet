@@ -5,6 +5,7 @@ authors = ["Ship <shiplet@protonmail.com>"]
 edition = "2018"
 
 [dependencies]
+bytes = "*"
 glium = "0.28"
 glium-glyph = "0.9.0"
 image = "*"

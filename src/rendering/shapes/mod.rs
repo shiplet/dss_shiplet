@@ -1,10 +1,20 @@
-use crate::types::{Container};
+use reqwest::{Error as rqErr};
+use crate::types::{Container, Item};
+use std::io;
+use std::io::Write;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Vertex {
 	pub data: VertexData,
 	pub self_location: Option<[f32; 2]>,
-	pub translate_dist: Option<[f32; 2]>,
+	pub texture: Option<TextureData>,
+	pub tst_distance: Option<[f32; 2]>,
+}
+
+#[derive(Clone, Debug)]
+pub struct TextureData {
+	pub texture_bytes: bytes::Bytes,
+	pub texture_id: String
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -38,19 +48,25 @@ impl Row {
 			total,
 		}
 	}
+
 	pub fn add_tiles(&mut self, container: &Container) {
-		let length = container.set.items.as_ref().unwrap().len() as i32;
+		let items = container.set.items.as_ref().unwrap();
+		let length = items.len() as i32;
 		let mut tiles = vec![];
 		for n in -length..0 {
+			print!("\rfetching images: [{}>{}]", "=".repeat((length + n) as usize), " ".repeat((-n - 1) as usize));
+			io::stdout().flush().unwrap();
+			let raw_img = self.get_image(&container.set.items.as_ref().unwrap()[-(n+1) as usize]).unwrap();
 			let og_index = length - n.abs();
 			let x = self.get_x_pos(og_index);
 			let y = self.get_y_pos();
-
-			let tile = create_tile(x, y, (length - n.abs()) as f32, self.index as f32);
+			let tile = create_tile(x, y, (length - n.abs()) as f32, self.index as f32, raw_img);
 			tiles.push(tile);
 		}
+		print!("\n");
 		self.tiles = Some(tiles);
 	}
+
 	pub fn add_row_title(&mut self, container: &Container) {
 		if let Some(title_top) = &container.set.text.title.full {
 			if let Some(title) = &title_top.set {
@@ -61,6 +77,25 @@ impl Row {
 				self.title_pos = [x_pos, y_pos];
 			}
 		}
+	}
+
+	fn get_image(&self, item: &Item) -> Result<TextureData, rqErr> {
+		let url = &item.image.tile["1.78"];
+		let mut img_url = String::new();
+		if let Some(s) = &url.series {
+			img_url = s.default.url.to_string();
+		}
+		if let Some(p) = &url.program {
+			img_url = p.default.url.to_string();
+		}
+		if let Some(d) = &url.default {
+			img_url = d.default.url.to_string();
+		}
+		let img_bytes = reqwest::blocking::get(&img_url)?.bytes()?;
+		Ok(TextureData{
+			texture_bytes: img_bytes,
+			texture_id: img_url
+		})
 	}
 
 	fn get_x_pos(&self, og_index: i32) -> f32 {
@@ -76,19 +111,18 @@ impl Row {
 		let padding_top = self.index as f32 * self.margin_top;
 		1.0 - (y_const + padding_top) - y_box_comp
 	}
-
 }
 
-pub fn create_tile(x: f32, y: f32, col: f32, row: f32) -> Vec<Vertex> {
+pub fn create_tile(x: f32, y: f32, col: f32, row: f32, tex: TextureData) -> Vec<Vertex> {
 	let x_trans = x * -1.0;
 	let y_trans = y * -1.0;
-	let vertex1 = Vertex { self_location: Some([col, row]), translate_dist: Some([x_trans, y_trans]), data: VertexData { position: [-0.15 + x,  0.15 + y],  tex_coords: [ 0.0, 0.99] }};
-	let vertex2 = Vertex { self_location: None, translate_dist: None, data: VertexData { position: [-0.15 + x, -0.15 + y],  tex_coords: [ 0.0,  0.0] }};
-	let vertex3 = Vertex { self_location: None, translate_dist: None, data: VertexData { position: [ 0.15 + x, -0.15 + y],  tex_coords: [0.99,  0.0] }};
+	let vertex1 = Vertex { self_location: Some([col, row]), texture: Some(tex), tst_distance: Some([x_trans, y_trans]), data: VertexData { position: [-0.15 + x,  0.15 + y],  tex_coords: [ 0.0, 0.99] }};
+	let vertex2 = Vertex { self_location: None, texture: None, tst_distance: None, data: VertexData { position: [-0.15 + x, -0.15 + y],  tex_coords: [ 0.0,  0.0] }};
+	let vertex3 = Vertex { self_location: None, texture: None, tst_distance: None, data: VertexData { position: [ 0.15 + x, -0.15 + y],  tex_coords: [0.99,  0.0] }};
 
-	let vertex4 = Vertex { self_location: None, translate_dist: None, data: VertexData { position: [-0.15 + x,  0.15 + y], tex_coords: [ 0.0, 0.99] }};
-	let vertex5 = Vertex { self_location: None, translate_dist: None, data: VertexData { position: [ 0.15 + x,  0.15 + y], tex_coords: [0.99, 0.99] }};
-	let vertex6 = Vertex { self_location: None, translate_dist: None, data: VertexData { position: [ 0.15 + x, -0.15 + y], tex_coords: [0.99,  0.0] }};
+	let vertex4 = Vertex { self_location: None, texture: None, tst_distance: None, data: VertexData { position: [-0.15 + x,  0.15 + y], tex_coords: [ 0.0, 0.99] }};
+	let vertex5 = Vertex { self_location: None, texture: None, tst_distance: None, data: VertexData { position: [ 0.15 + x,  0.15 + y], tex_coords: [0.99, 0.99] }};
+	let vertex6 = Vertex { self_location: None, texture: None, tst_distance: None, data: VertexData { position: [ 0.15 + x, -0.15 + y], tex_coords: [0.99,  0.0] }};
 	let shape = vec![vertex1, vertex2, vertex3, vertex4, vertex5, vertex6];
 	shape
 }

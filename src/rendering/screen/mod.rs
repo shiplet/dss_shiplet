@@ -7,7 +7,7 @@ use glium_glyph::GlyphBrush;
 use glium_glyph::glyph_brush::rusttype::Scale;
 use glium_glyph::glyph_brush::{rusttype::Font, Section};
 use std::cmp::{min, max};
-use std::io::{Cursor, stdout, Write};
+use std::io::Cursor;
 use std::time::{Duration, Instant};
 
 use crate::rendering::shapes::{VertexData, Row};
@@ -22,6 +22,8 @@ pub struct Screen<'a> {
 	pub active_location: ActiveLocation,
 	pub current_row_positions: Vec<f32>,
 	pub display: Display,
+	pub global_position_cache: HashMap<String, f32>,
+	pub height: i32,
 	pub horizontal: f32,
 	pub indices: NoIndices,
 	pub program: Option<Program>,
@@ -30,10 +32,9 @@ pub struct Screen<'a> {
 	pub rows_count: f32,
 	pub text_renderer: GlyphBrush<'a,'a>,
 	pub texture: Option<glium::texture::SrgbTexture2d>,
-	pub texture_map: HashMap<String, glium::texture::SrgbTexture2d>,
+	pub texture_cache: HashMap<String, glium::texture::SrgbTexture2d>,
 	pub vertex_buffers: Vec<VertexBufferContainer>,
 	pub vertical: f32,
-	pub height: i32,
 	pub width: i32
 }
 
@@ -56,12 +57,15 @@ impl<'a> Screen<'a> {
 			virtual_x: 0,
 			virtual_y: 0,
 			virtual_x_limit: ((2.0 / 0.375) as f32).floor() as i32,
-			virtual_y_limit: ((2.0 / 0.625) as f32).floor() as i32
+			virtual_y_limit: ((2.0 / 0.625) as f32).floor() as i32,
+			virtual_x_cache: HashMap::new(),
+			x_cache: HashMap::new()
 		};
 		Screen {
 			active_location,
 			current_row_positions: Vec::new(),
 			display,
+			global_position_cache: HashMap::new(),
 			horizontal: 0.0,
 			indices: glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList),
 			program: None,
@@ -70,7 +74,7 @@ impl<'a> Screen<'a> {
 			rows_count: 0.0,
 			text_renderer,
 			texture: None,
-			texture_map: HashMap::new(),
+			texture_cache: HashMap::new(),
 			vertex_buffers: Vec::new(),
 			vertical: 0.0,
 			width,
@@ -197,16 +201,14 @@ impl<'a> Screen<'a> {
 
 
 		for buffer in self.vertex_buffers.iter() {
-			let mut horizontal = 0.0;
-			let mut vertical = 0.0;
 			let self_location = buffer.self_location;
 			let tst_distance = buffer.tst_distance;
-			if self_location[1] == active_location[1] && self.active_location.should_translate_row() {
-				horizontal = (self.active_location.x - self.active_location.virtual_x) as f32 * -0.375;
+			if self_location[1] == active_location[1] {
+				let horizontal = (self.active_location.x - self.active_location.virtual_x) as f32 * -0.375;
+				self.global_position_cache.insert(self_location[1].to_string(), horizontal);
 			}
-			if self.active_location.should_translate_col() {
-				vertical = (self.active_location.y - self.active_location.virtual_y) as f32 * 0.675;
-			}
+			let vertical = (self.active_location.y - self.active_location.virtual_y) as f32 * 0.675;
+			let horizontal = self.global_position_cache.entry(self_location[1].to_string()).or_insert(0.0).to_owned();
 			let mtx = [
 				[1.0, 0.0, 0.0, 0.0],
 				[0.0, 1.0, 0.0, 0.0],
@@ -291,7 +293,9 @@ pub struct ActiveLocation {
 	virtual_x: i32,
 	virtual_y: i32,
 	virtual_x_limit: i32,
-	virtual_y_limit: i32
+	virtual_y_limit: i32,
+	virtual_x_cache: HashMap<String, i32>,
+	x_cache: HashMap<String, i32>,
 }
 
 impl ActiveLocation {
@@ -306,26 +310,28 @@ impl ActiveLocation {
 		if self.last_tick.elapsed() >= self.debounce {
 			self.virtual_y = max(0, self.virtual_y - 1);
 			self.y = max(0, self.y - 1);
-			print!("\ractive: ({}, {}) | virtual: ({}, {}) | should translate col: {}{}", self.x, self.y, self.virtual_x, self.virtual_y, self.should_translate_col(), " ".repeat(10));
-			stdout().flush().unwrap();
+			let previous_virtual_x = self.virtual_x_cache.entry(self.y.to_string()).or_insert(self.virtual_x).to_owned();
+			let previous_x = self.x_cache.entry(self.y.to_string()).or_insert(self.x).to_owned();
+			println!("({} - {}) + ({} - {})", self.x, self.virtual_x, previous_x, previous_virtual_x);
+			self.x += (self.x - self.virtual_x) + (previous_x - previous_virtual_x);
 			self.last_tick = Instant::now();
 		}
 	}
 	pub fn move_down(&mut self) {
 		if self.last_tick.elapsed() >= self.debounce {
+			self.x_cache.insert(self.y.to_string(), self.x);
+			self.virtual_x_cache.insert(self.y.to_string(), self.virtual_x);
+
 			self.virtual_y = min(self.virtual_y_limit - 1, self.virtual_y + 1);
 			self.y = min(self.y_limit - 1, self.y + 1);
-			print!("\ractive: ({}, {}) | virtual: ({}, {}) | should translate col: {}{}", self.x, self.y, self.virtual_x, self.virtual_y, self.should_translate_col(), " ".repeat(10));
-			stdout().flush().unwrap();
+			self.x -= self.x - self.virtual_x;
 			self.last_tick = Instant::now();
 		}
 	}
 	pub fn move_left(&mut self) {
 		if self.last_tick.elapsed() >= self.debounce {
 			self.virtual_x = max(0, self.virtual_x - 1);
-			self.x = max(0, self.x- 1);
-			print!("\ractive: ({}, {}) | virtual: ({}, {}) | should translate row: {}{}", self.x, self.y, self.virtual_x, self.virtual_y, self.should_translate_row(), " ".repeat(10));
-			stdout().flush().unwrap();
+			self.x = max(0, self.x - 1);
 			self.last_tick = Instant::now();
 		}
 	}
@@ -333,18 +339,8 @@ impl ActiveLocation {
 		if self.last_tick.elapsed() >= self.debounce {
 			self.virtual_x = min(self.virtual_x_limit - 1, self.virtual_x + 1);
 			self.x = min(self.x_limit - 1, self.x + 1);
-			print!("\ractive: ({}, {}) | virtual: ({}, {}) | should translate row: {}{}", self.x, self.y, self.virtual_x, self.virtual_y, self.should_translate_row(), " ".repeat(10));
-			stdout().flush().unwrap();
 			self.last_tick = Instant::now();
 		}
-	}
-
-	pub fn should_translate_row(&self) -> bool {
-		(self.virtual_x >= 0 && self.x > 0) || (self.virtual_x == self.virtual_x_limit - 1 && (self.x > self.virtual_x && self.x < self.x_limit))
-	}
-
-	pub fn should_translate_col(&self) -> bool {
-		(self.virtual_y >= 0 && self.y > 0) || (self.virtual_y == self.virtual_y_limit - 1 && (self.y > self.virtual_y && self.y < self.y_limit))
 	}
 }
 

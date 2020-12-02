@@ -13,6 +13,15 @@ $ cargo build --release
 $ ./target/release/dss_shiplet // dss_shiplet.exe on Windows
 ```
 
+or, to run the provided binaries
+
+```bash
+$ ./dss_shiplet
+```
+```powershell
+PS C:\..\dss_shiplet> ./dss_shiplet.exe
+```
+
 On Windows, there may be temporary flash of an empty white screen while the grid's images download.
 
 ## Navigating the UI

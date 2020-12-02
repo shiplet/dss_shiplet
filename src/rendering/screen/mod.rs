@@ -233,15 +233,13 @@ impl<'a> Screen<'a> {
 		let screen_dims = self.display.get_framebuffer_dimensions();
 
 		for row in &self.row_titles {
-			let adjusted_vertical = row.pos[1] * (self.active_location.virtual_y - self.active_location.y) as f32 * 0.625;
-            print!("\ractive y: {} | virtual y: {} | offset: {}{}", self.active_location.y, self.active_location.virtual_y, adjusted_vertical, " ".repeat(25));
 			stdout().flush().unwrap();
 			self.text_renderer.queue(Section{
 				text: &row.title.to_string(),
 				bounds: (screen_dims.0 as f32, screen_dims.1 as f32 / 2.0),
 				color: [1.0, 1.0, 1.0, 1.0],
 				scale: Scale::uniform(24.0),
-				screen_position: (row.pos[0] * self.width as f32, row.pos[1] * self.height as f32),
+				screen_position: (row.pos[0] * self.width as f32, (row.pos[1] - (vertical * 0.5)) * self.height as f32),
 				..Section::default()
 			});
 		}

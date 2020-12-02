@@ -11,7 +11,7 @@ use std::io::{Cursor, stdout, Write};
 use std::time::{Duration, Instant};
 
 use crate::rendering::shapes::{VertexData, Row};
-use crate::types::Container;
+use crate::data::types::Container;
 use crate::Vertex;
 
 use bytes::Buf;
@@ -88,8 +88,6 @@ impl<'a> Screen<'a> {
 		self.rows_count = self.rows.len() as f32;
 		self.active_location.set_max_rows(self.rows_count as i32);
 		self.current_row_positions = vec![0.0 as f32; self.rows.len() as usize];
-		// self.active_limit_x = (((1.0_f32 / 3.75_f32) * 2.0_f32) * 10.0).floor();
-		// self.active_limit_y = ((1.0_f32 / 3.0_f32) * 10.0).floor();
 	}
 
 	pub fn use_default_tile_shaders(&mut self) {
@@ -137,7 +135,7 @@ impl<'a> Screen<'a> {
 		self.program = Some(glium::Program::from_source(&self.display, vertex_shader_src, fragment_shader_src, None).unwrap());
 	}
 
-	pub fn add_shape(&mut self, v: &[Vertex]) {
+	pub fn add_tile(&mut self, v: &[Vertex]) {
 		let mut v_data = Vec::new();
 		for vtx in v.iter() {
 			v_data.push(vtx.data);
@@ -146,9 +144,9 @@ impl<'a> Screen<'a> {
 		let texture = v[0].texture.clone().unwrap();
 		let vbc = VertexBufferContainer{
 			buffer: vertex_buffer,
-			self_location: v[0].self_location.unwrap(), // only need the first one since it's the left-most x-coordinate
-			tst_distance: v[0].tst_distance.unwrap(), // ^^ ditto here
-			texture_bytes: texture.texture_bytes,			// ^^ ditto again
+			self_location: v[0].self_location.unwrap(), // only need the first one since it's the leftmost x-coordinate
+			tst_distance: v[0].tst_distance.unwrap(), 	// ^^ ditto here
+			texture_bytes: texture.texture_bytes,		// ^^ ditto again
 			texture_id: texture.texture_id
 		};
 		self.vertex_buffers.push(vbc);
@@ -161,7 +159,7 @@ impl<'a> Screen<'a> {
 			pos: row.title_pos
 		});
 		for n in row.tiles.unwrap() {
-			self.add_shape(&n);
+			self.add_tile(&n);
 		}
 	}
 

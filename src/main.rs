@@ -1,5 +1,4 @@
 mod rendering;
-mod types;
 mod data;
 
 #[macro_use]
@@ -10,7 +9,7 @@ extern crate image;
 use crate::data::{prepare_data};
 use crate::rendering::screen::{Screen};
 use crate::rendering::shapes::{Vertex, Row};
-use crate::types::{DSSData};
+use data::types::{DSSData};
 use std::collections::HashMap;
 
 fn main() {

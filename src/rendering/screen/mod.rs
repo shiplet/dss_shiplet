@@ -7,12 +7,12 @@ use glium_glyph::GlyphBrush;
 use glium_glyph::glyph_brush::rusttype::Scale;
 use glium_glyph::glyph_brush::{rusttype::Font, Section};
 use std::cmp::{min, max};
-use std::io::Cursor;
+use std::io::{Cursor, stdout, Write};
 use std::time::{Duration, Instant};
 
 use crate::rendering::shapes::{VertexData, Row};
-use crate::types::Container;
-use crate::{Vertex};
+use crate::data::types::Container;
+use crate::Vertex;
 
 use bytes::Buf;
 use std::collections::HashMap;
@@ -20,6 +20,7 @@ use std::collections::hash_map::Entry;
 
 pub struct Screen<'a> {
 	pub active_location: ActiveLocation,
+	pub active_scale_ratio: f32,
 	pub current_row_positions: Vec<f32>,
 	pub display: Display,
 	pub global_position_cache: HashMap<String, f32>,
@@ -62,6 +63,7 @@ impl<'a> Screen<'a> {
 		};
 		Screen {
 			active_location,
+			active_scale_ratio: 1.45,
 			current_row_positions: Vec::new(),
 			display,
 			global_position_cache: HashMap::new(),
@@ -86,8 +88,6 @@ impl<'a> Screen<'a> {
 		self.rows_count = self.rows.len() as f32;
 		self.active_location.set_max_rows(self.rows_count as i32);
 		self.current_row_positions = vec![0.0 as f32; self.rows.len() as usize];
-		// self.active_limit_x = (((1.0_f32 / 3.75_f32) * 2.0_f32) * 10.0).floor();
-		// self.active_limit_y = ((1.0_f32 / 3.0_f32) * 10.0).floor();
 	}
 
 	pub fn use_default_tile_shaders(&mut self) {
@@ -135,7 +135,7 @@ impl<'a> Screen<'a> {
 		self.program = Some(glium::Program::from_source(&self.display, vertex_shader_src, fragment_shader_src, None).unwrap());
 	}
 
-	pub fn add_shape(&mut self, v: &[Vertex]) {
+	pub fn add_tile(&mut self, v: &[Vertex]) {
 		let mut v_data = Vec::new();
 		for vtx in v.iter() {
 			v_data.push(vtx.data);
@@ -144,9 +144,9 @@ impl<'a> Screen<'a> {
 		let texture = v[0].texture.clone().unwrap();
 		let vbc = VertexBufferContainer{
 			buffer: vertex_buffer,
-			self_location: v[0].self_location.unwrap(), // only need the first one since it's the left-most x-coordinate
-			tst_distance: v[0].tst_distance.unwrap(), // ^^ ditto here
-			texture_bytes: texture.texture_bytes,			// ^^ ditto again
+			self_location: v[0].self_location.unwrap(), // only need the first one since it's the leftmost x-coordinate
+			tst_distance: v[0].tst_distance.unwrap(), 	// ^^ ditto here
+			texture_bytes: texture.texture_bytes,		// ^^ ditto again
 			texture_id: texture.texture_id
 		};
 		self.vertex_buffers.push(vbc);
@@ -159,7 +159,7 @@ impl<'a> Screen<'a> {
 			pos: row.title_pos
 		});
 		for n in row.tiles.unwrap() {
-			self.add_shape(&n);
+			self.add_tile(&n);
 		}
 	}
 
@@ -199,6 +199,7 @@ impl<'a> Screen<'a> {
 		let active_location = self.active_location.to_vec();
 
 
+		let vertical = (self.active_location.y - self.active_location.virtual_y) as f32 * 0.625;
 		for buffer in self.vertex_buffers.iter() {
 			let self_location = buffer.self_location;
 			let tst_distance = buffer.tst_distance;
@@ -206,7 +207,6 @@ impl<'a> Screen<'a> {
 				let horizontal = (self.active_location.x - self.active_location.virtual_x) as f32 * -0.375;
 				self.global_position_cache.insert(self_location[1].to_string(), horizontal);
 			}
-			let vertical = (self.active_location.y - self.active_location.virtual_y) as f32 * 0.675;
 			let horizontal = self.global_position_cache.entry(self_location[1].to_string()).or_insert(0.0).to_owned();
 			let mtx = [
 				[1.0, 0.0, 0.0, 0.0],
@@ -219,7 +219,7 @@ impl<'a> Screen<'a> {
 			let uniforms = uniform! {
 				active_location: active_location,
 				matrix: mtx,
-				scale: 1.25 as f32,
+				scale: self.active_scale_ratio,
 				self_location: self_location,
 				tex: img,
 				td: tst_distance,
@@ -231,12 +231,13 @@ impl<'a> Screen<'a> {
 		let screen_dims = self.display.get_framebuffer_dimensions();
 
 		for row in &self.row_titles {
+			stdout().flush().unwrap();
 			self.text_renderer.queue(Section{
 				text: &row.title.to_string(),
 				bounds: (screen_dims.0 as f32, screen_dims.1 as f32 / 2.0),
 				color: [1.0, 1.0, 1.0, 1.0],
 				scale: Scale::uniform(24.0),
-				screen_position: (row.pos[0] * self.width as f32, row.pos[1] * self.height as f32),
+				screen_position: (row.pos[0] * self.width as f32, (row.pos[1] - (vertical * 0.5)) * self.height as f32),
 				..Section::default()
 			});
 		}
@@ -323,7 +324,7 @@ impl ActiveLocation {
 			self.virtual_y = min(self.virtual_y_limit - 1, self.virtual_y + 1);
 			self.y = min(self.y_limit - 1, self.y + 1);
 
-			let target_row_snapshot = self.x_cache.entry(self.y.to_string()).or_insert(row_snapshot).to_owned();
+			let target_row_snapshot = self.x_cache.entry(self.y.to_string()).or_insert((0..self.virtual_x_limit).collect()).to_owned();
 			self.x = target_row_snapshot[self.virtual_x as usize];
 			self.last_tick = Instant::now();
 		}

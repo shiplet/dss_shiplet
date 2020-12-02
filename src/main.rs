@@ -1,5 +1,4 @@
 mod rendering;
-mod types;
 mod data;
 
 #[macro_use]
@@ -10,10 +9,8 @@ extern crate image;
 use crate::data::{prepare_data};
 use crate::rendering::screen::{Screen};
 use crate::rendering::shapes::{Vertex, Row};
-use crate::types::{DSSData};
+use data::types::{DSSData};
 use std::collections::HashMap;
-
-// const DEBUG: bool = false;
 
 fn main() {
 	let data = prepare_data().unwrap();
@@ -42,10 +39,6 @@ fn render(data: DSSData) {
 		row.add_row_title(&container);
 		renderer.add_row(row);
 	}
-
-	// if DEBUG {
-	// 	print!("{}", "\n".repeat(renderer.rows_count as usize)); // this is for the ANSI escape codes used later on
-	// }
 
 	event_loop.run(move |ev, _, control_flow| {
 		renderer.render(&ev, control_flow, &mut texture_cache);

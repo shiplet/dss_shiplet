@@ -1,5 +1,5 @@
 use reqwest::{Error as rqErr};
-use crate::types::{Container, Item};
+use crate::data::types::{Container, Item};
 use std::io;
 use std::io::Write;
 

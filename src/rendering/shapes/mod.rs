@@ -8,7 +8,7 @@ pub struct Vertex {
 	pub data: VertexData,
 	pub self_location: Option<[f32; 2]>,
 	pub texture: Option<TextureData>,
-	pub translate_dist: Option<[f32; 2]>,
+	pub tst_distance: Option<[f32; 2]>,
 }
 
 #[derive(Clone, Debug)]
@@ -116,13 +116,13 @@ impl Row {
 pub fn create_tile(x: f32, y: f32, col: f32, row: f32, tex: TextureData) -> Vec<Vertex> {
 	let x_trans = x * -1.0;
 	let y_trans = y * -1.0;
-	let vertex1 = Vertex { self_location: Some([col, row]), texture: Some(tex), translate_dist: Some([x_trans, y_trans]), data: VertexData { position: [-0.15 + x,  0.15 + y],  tex_coords: [ 0.0, 0.99] }};
-	let vertex2 = Vertex { self_location: None, texture: None, translate_dist: None, data: VertexData { position: [-0.15 + x, -0.15 + y],  tex_coords: [ 0.0,  0.0] }};
-	let vertex3 = Vertex { self_location: None, texture: None, translate_dist: None, data: VertexData { position: [ 0.15 + x, -0.15 + y],  tex_coords: [0.99,  0.0] }};
+	let vertex1 = Vertex { self_location: Some([col, row]), texture: Some(tex), tst_distance: Some([x_trans, y_trans]), data: VertexData { position: [-0.15 + x,  0.15 + y],  tex_coords: [ 0.0, 0.99] }};
+	let vertex2 = Vertex { self_location: None, texture: None, tst_distance: None, data: VertexData { position: [-0.15 + x, -0.15 + y],  tex_coords: [ 0.0,  0.0] }};
+	let vertex3 = Vertex { self_location: None, texture: None, tst_distance: None, data: VertexData { position: [ 0.15 + x, -0.15 + y],  tex_coords: [0.99,  0.0] }};
 
-	let vertex4 = Vertex { self_location: None, texture: None, translate_dist: None, data: VertexData { position: [-0.15 + x,  0.15 + y], tex_coords: [ 0.0, 0.99] }};
-	let vertex5 = Vertex { self_location: None, texture: None, translate_dist: None, data: VertexData { position: [ 0.15 + x,  0.15 + y], tex_coords: [0.99, 0.99] }};
-	let vertex6 = Vertex { self_location: None, texture: None, translate_dist: None, data: VertexData { position: [ 0.15 + x, -0.15 + y], tex_coords: [0.99,  0.0] }};
+	let vertex4 = Vertex { self_location: None, texture: None, tst_distance: None, data: VertexData { position: [-0.15 + x,  0.15 + y], tex_coords: [ 0.0, 0.99] }};
+	let vertex5 = Vertex { self_location: None, texture: None, tst_distance: None, data: VertexData { position: [ 0.15 + x,  0.15 + y], tex_coords: [0.99, 0.99] }};
+	let vertex6 = Vertex { self_location: None, texture: None, tst_distance: None, data: VertexData { position: [ 0.15 + x, -0.15 + y], tex_coords: [0.99,  0.0] }};
 	let shape = vec![vertex1, vertex2, vertex3, vertex4, vertex5, vertex6];
 	shape
 }

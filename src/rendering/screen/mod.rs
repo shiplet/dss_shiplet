@@ -30,8 +30,8 @@ pub struct Screen<'a> {
 	pub rows: Vec<Container>,
 	pub rows_count: f32,
 	pub text_renderer: GlyphBrush<'a,'a>,
-	pub texture: Option<glium::texture::Texture2d>,
-	pub texture_map: HashMap<String, glium::texture::Texture2d>,
+	pub texture: Option<glium::texture::SrgbTexture2d>,
+	pub texture_map: HashMap<String, glium::texture::SrgbTexture2d>,
 	pub vertex_buffers: Vec<VertexBufferContainer>,
 	pub vertical: f32,
 	pub height: i32,
@@ -149,16 +149,7 @@ impl<'a> Screen<'a> {
 		}
 	}
 
-	// fn get_placeholder_texture(&mut self) -> glium::texture::Texture2d {
-	// 	let img = image::load(Cursor::new(&include_bytes!("./images/disney_bg.png")[..]),
-	// 						  image::ImageFormat::Png).unwrap().to_rgba16();
-	// 	let image_dimensions = img.dimensions();
-	// 	let img = glium::texture::RawImage2d::from_raw_rgba_reversed(&img.into_raw(), image_dimensions);
-	// 	let tex = glium::texture::Texture2d::new(&self.display, img).unwrap();
-	// 	tex
-	// }
-
-	fn get_or_create_texture(texture_map: &'a mut HashMap<String, glium::texture::Texture2d>, display: &Display, tex_id: String, tex_bytes: &bytes::Bytes) -> &'a glium::texture::Texture2d {
+	fn get_or_create_texture(texture_map: &'a mut HashMap<String, glium::texture::SrgbTexture2d>, display: &Display, tex_id: String, tex_bytes: &bytes::Bytes) -> &'a glium::texture::SrgbTexture2d {
         match texture_map.entry(tex_id.clone()) {
             Entry::Occupied(t) => t.into_mut(),
 			Entry::Vacant(m) => {
@@ -167,14 +158,14 @@ impl<'a> Screen<'a> {
 					Ok(i) => {
 						let img = &i.to_rgba16();
 						let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
-						let t = glium::texture::Texture2d::new(display, img).unwrap();
+						let t = glium::texture::SrgbTexture2d::new(display, img).unwrap();
 						m.insert(t)
 					},
 					Err(_) => {
 						let img = image::load(Cursor::new(&include_bytes!("./images/disney_bg.png")[..]),
 											  image::ImageFormat::Png).unwrap().to_rgba16();
 						let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
-						let t = glium::texture::Texture2d::new(display, img).unwrap();
+						let t = glium::texture::SrgbTexture2d::new(display, img).unwrap();
 						m.insert(t)
 					}
 				}
@@ -183,7 +174,7 @@ impl<'a> Screen<'a> {
         texture_map.get(tex_id.as_str()).unwrap()
 	}
 
-	pub fn render(&mut self, ev: &Event<()>, control_flow: &mut ControlFlow, texture_cache: &mut HashMap<String, glium::texture::Texture2d>) {
+	pub fn render(&mut self, ev: &Event<()>, control_flow: &mut ControlFlow, texture_cache: &mut HashMap<String, glium::texture::SrgbTexture2d>) {
 		let program = match self.program.as_mut() {
 			Some(pg) => pg,
 			None => panic!("must specify shaders - try calling use_default_shaders before running loop")

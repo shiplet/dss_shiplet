@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 bytes = "*"
-glium = { "version" = "0.28", features = ["default"]}
+glium = "0.28"
 glium-glyph = "0.9.0"
 image = "*"
 reqwest = { "version" = "0.10.9", features = ["blocking"]}

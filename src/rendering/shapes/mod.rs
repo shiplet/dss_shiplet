@@ -1,5 +1,7 @@
 use reqwest::{Error as rqErr};
 use crate::types::{Container, Item};
+use std::io;
+use std::io::Write;
 
 #[derive(Clone, Debug)]
 pub struct Vertex {
@@ -52,6 +54,8 @@ impl Row {
 		let length = items.len() as i32;
 		let mut tiles = vec![];
 		for n in -length..0 {
+			print!("\rfetching images: [{}>{}]", "=".repeat((length + n) as usize), " ".repeat((-n - 1) as usize));
+			io::stdout().flush().unwrap();
 			let raw_img = self.get_image(&container.set.items.as_ref().unwrap()[-(n+1) as usize]).unwrap();
 			let og_index = length - n.abs();
 			let x = self.get_x_pos(og_index);
@@ -59,6 +63,7 @@ impl Row {
 			let tile = create_tile(x, y, (length - n.abs()) as f32, self.index as f32, raw_img);
 			tiles.push(tile);
 		}
+		print!("\n");
 		self.tiles = Some(tiles);
 	}
 

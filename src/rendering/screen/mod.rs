@@ -168,21 +168,13 @@ impl<'a> Screen<'a> {
             Entry::Occupied(t) => t.into_mut(),
 			Entry::Vacant(m) => {
 				let img = image::load_from_memory(tex_bytes.bytes());
-				match img {
-					Ok(i) => {
-						let img = &i.to_rgba16();
-						let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
-						let t = glium::texture::SrgbTexture2d::new(display, img).unwrap();
-						m.insert(t)
-					},
-					Err(_) => {
-						let img = image::load(Cursor::new(&include_bytes!("./images/disney_bg.png")[..]),
-											  image::ImageFormat::Png).unwrap().to_rgba16();
-						let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img.as_raw(), img.dimensions());
-						let t = glium::texture::SrgbTexture2d::new(display, img).unwrap();
-						m.insert(t)
-					}
-				}
+				let img_raw = match img {
+					Ok(i) => { i.to_rgba16() },
+					Err(_) => { image::load(Cursor::new(&include_bytes!("./images/disney_bg.png")[..]),image::ImageFormat::Png).unwrap().to_rgba16() }
+				};
+				let img = glium::texture::RawImage2d::from_raw_rgba_reversed(img_raw.as_raw(), img_raw.dimensions());
+				let t = glium::texture::SrgbTexture2d::new(display, img).unwrap();
+				m.insert(t)
 			}
 		};
         texture_map.get(tex_id.as_str()).unwrap()
@@ -203,7 +195,7 @@ impl<'a> Screen<'a> {
 		for buffer in self.vertex_buffers.iter() {
 			let self_location = buffer.self_location;
 			let tst_distance = buffer.tst_distance;
-			if self_location[1] == active_location[1] {
+			if self_location[1] == active_location[1] { // y-position
 				let horizontal = (self.active_location.x - self.active_location.virtual_x) as f32 * -0.375;
 				self.global_position_cache.insert(self_location[1].to_string(), horizontal);
 			}

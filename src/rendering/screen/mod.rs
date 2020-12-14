@@ -234,8 +234,6 @@ impl<'a> Screen<'a> {
 			});
 		}
 
-
-
 		self.text_renderer.draw_queued(&self.display, &mut target);
 		target.finish().unwrap();
 		let next_frame_time = std::time::Instant::now() + std::time::Duration::from_nanos(166_666_667);
@@ -252,6 +250,7 @@ impl<'a> Screen<'a> {
 						VirtualKeyCode::Down => { self.active_location.move_down(); }
 						VirtualKeyCode::Left => { self.active_location.move_left(); }
 						VirtualKeyCode::Right => { self.active_location.move_right(); }
+                        VirtualKeyCode::Escape => { *control_flow = glutin::event_loop::ControlFlow::Exit; }
 						_ => ()
 					},
 					_ => (),

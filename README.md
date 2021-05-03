@@ -1,4 +1,4 @@
-# DSS Shiplet Homework
+# DSS GUI
 Requires `rustc` version 1.47 or higher. Currently compiles on both macOS and Windows.
 
 ## To Build

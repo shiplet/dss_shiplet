@@ -1,5 +1,5 @@
-# DSS GUI
-Requires `rustc` version 1.47 or higher. Currently compiles on both macOS and Windows.
+# Rust GUI
+Requires `rustc` version 1.47 or higher. Currently compiles on both macOS and Windows, but not on Apple Silicon (yet).
 
 ## To Build
 ```bash
